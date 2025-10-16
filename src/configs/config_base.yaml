@@ -1,0 +1,4 @@
+harvesters:
+  cti_path: "/opt/mvIMPACT_Acquire/lib/x86_64/mvGenTLProducer.cti"
+  log_level: "INFO"
+  timeout_ms: 5000
