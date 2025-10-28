@@ -5,16 +5,14 @@ Defines top-level imports for the Universal Camera SDK API based on the Harveste
 Configures a global logger for consistent output across modules.
 """
 
+from .utils.logging_utils import setup_logging, get_logger
 import logging
 
-# Configure global logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="[%(asctime)s] [%(levelname)s] %(name)s: %(message)s",
-    datefmt="%H:%M:%S"
+# Initialize logging
+setup_logging(
+    level=logging.DEBUG,
+    log_file="logs/harvesters_sdk.log"
 )
-
-logger = logging.getLogger("harvestersSDK")
 
 # Import base classes
 from .base.camera_base import CameraBase
@@ -27,4 +25,6 @@ __all__ = [
     "CameraBase",
     "TransportHarvesters",
     "CameraATSensors3D",
+    "setup_logging",
+    "get_logger",
 ]

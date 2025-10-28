@@ -7,21 +7,20 @@ This module provides a high-level interface to create and manage cameras,
 abstracting away the internal implementation details.
 """
 
-import logging
-import yaml
 from typing import Optional
 
 from src.vendors.at_sensors_3d import CameraATSensors3D
 from src.utils.error_handling import CameraError
 from src.utils.config_loader import ConfigLoader
+from src.utils.logging_utils import get_logger
 
 # ---------------------------------------------------------------------
 # Logging configuration
 # ---------------------------------------------------------------------
-logger = logging.getLogger("harvestersSDK.API")
+logger = get_logger("API")
 
 # ---------------------------------------------------------------------
-# Supported cameras registry
+# Supported cameras registry (add more as needed)
 # ---------------------------------------------------------------------
 _CAMERA_REGISTRY = {
     "at_sensors_3d": CameraATSensors3D,

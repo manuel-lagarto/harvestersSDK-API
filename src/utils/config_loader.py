@@ -5,11 +5,12 @@ Loads and merges configuration files (base + camera-specific).
 """
 
 import yaml
-import logging
 from pathlib import Path
 from src.utils.error_handling import CameraError
+from src.utils.logging_utils import get_logger
 
-logger = logging.getLogger("harvestersSDK.ConfigLoader")
+# Logging configuration
+logger = get_logger("ConfigLoader")
 
 
 class ConfigLoader:
@@ -24,7 +25,6 @@ class ConfigLoader:
 
     def load(self):
         """Load and merge base + camera-specific configs."""
-        self.config = {}
         self._load_yaml(self.base_config_path)
         self._load_yaml(self.camera_config_path)
         logger.info(f"Configurations loaded: {self.config.keys()}")
