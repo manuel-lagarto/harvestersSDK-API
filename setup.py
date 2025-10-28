@@ -7,7 +7,7 @@ print("Supported cameras:", list_supported_cameras())
 
 # Option 2: Config via dictionary
 config = {
-    "cti_path": "C:/Program Files/Balluff/ImpactAcquire/bin/x64/mvGenTLProducer.cti",
+    #"cti_path": "C:/Program Files/Balluff/ImpactAcquire/bin/x64/mvGenTLProducer.cti",
     "device_name": 'C6-21815221'
 }
 camera = create_camera("at_sensors_3d", config_dict=config)

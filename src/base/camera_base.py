@@ -41,7 +41,7 @@ class CameraBase(ABC):
 
         # Initialize transport layer
         try:
-            cti_path = config.get("cti_path")
+            cti_path = config.get("cti_path", "/opt/cvb/drivers/genicam/libGevTL.cti")
             if not cti_path:
                 raise CameraError("CTI path not provided in configuration")
             

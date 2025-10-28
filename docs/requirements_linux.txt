@@ -1,0 +1,13 @@
+colorama
+exceptiongroup
+genicam
+harvesters
+iniconfig
+numpy
+packaging
+pluggy
+pytest
+pytest-mock
+PyYAML
+tomli
+typing_extensions
