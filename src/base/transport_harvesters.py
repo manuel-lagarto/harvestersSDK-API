@@ -149,6 +149,7 @@ class TransportHarvesters:
                 logger.info("No device configuration provided. Connecting to first available device.")
                 self.image_acquirer = self.harvester.create(0)
                 logger.info("Connected to first available device (index 0).")
+                self._is_connected = True
                 return self.image_acquirer
 
             # Get list of all devices
@@ -166,7 +167,7 @@ class TransportHarvesters:
                     
                     self.image_acquirer = self.harvester.create(idx)
                     logger.info(f"Connected to device at index {idx}")
-                    self._is_acquiring = True
+                    self._is_connected = True
                     return self.image_acquirer
 
             # If no device found
@@ -195,6 +196,7 @@ class TransportHarvesters:
             
             logger.info(f"{self.__class__.__name__} disconnected successfully.")
             self._is_acquiring = False
+            self._is_connected = False
         except Exception as e:
             logger.exception("Error during transport disconnect.")
             raise CameraError(f"Failed to disconnect transport: {e}")
