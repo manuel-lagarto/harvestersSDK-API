@@ -45,7 +45,7 @@ def setup_logging(
     logger = logging.getLogger("harvestersSDK")
     logger.info(f"Logging initialized at level {logging.getLevelName(level)}")
     if log_file:
-        logger.info(f"Logging to file: {log_file}")
+        logger.debug(f"Logging to file: {log_file}")
 
 def get_logger(name: str) -> logging.Logger:
     """

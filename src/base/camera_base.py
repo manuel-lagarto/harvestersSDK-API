@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Optional, Dict
+from typing import Optional, Dict, Any, List
 
 from src.base.transport_harvesters import TransportHarvesters
 from src.utils.error_handling import CameraError
@@ -31,6 +31,7 @@ class CameraBase(ABC):
         self.timeout_ms = config.get("timeout_ms", 5000)
 
         # Extract device configuration
+        # TODO: add index option
         self.device_config: Dict[str, str] = {
             'user_defined_name': config.get('device_name', ''),
             'serial_number': config.get('device_serial', ''),
@@ -46,8 +47,8 @@ class CameraBase(ABC):
                 raise CameraError("CTI path not provided in configuration")
             
             self._transport = TransportHarvesters(cti_path)
-            logger.info(f"{self.__class__.__name__} initialized with transport layer")
-            logger.debug(f"Configuration: CTI={cti_path}, Device={self.device_config}")        
+            logger.debug(f"{self.__class__.__name__} initialized.")
+            logger.info(f"Configuration: CTI File = {cti_path}; Device Configuration = {self.device_config}")        
         except Exception as e:
             logger.error(f"Failed to initialize transport layer: {e}")
             self._transport = None

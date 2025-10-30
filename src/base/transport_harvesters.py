@@ -93,10 +93,10 @@ class TransportHarvesters:
                 'serial_number': device_info.serial_number,
                 'user_defined_name': device_info.user_defined_name
             })
-            logger.debug(f"Found device {idx}: {device_info.model} (S/N: {device_info.serial_number})")
+            logger.debug(f"Found device {idx}: Name = {device_info.user_defined_name}; Model = {device_info.model}; S/N = {device_info.serial_number}")
         
         logger.info(f"Total found devices: {len(self.harvester.device_info_list)}")
-        logger.info(self.devices_list)
+        logger.debug(f"Complete device list: {self.devices_list}")
         
         return self.devices_list
 
@@ -159,14 +159,14 @@ class TransportHarvesters:
             for idx, device in enumerate(devices):
                 # Check if any provided criteria matches the device
                 if (('user_defined_name' in device_config and 
-                    device_config['user_defined_name'] == device['user_defined_name']) or
+                    device['user_defined_name'] == device_config['user_defined_name']) or
                     ('serial_number' in device_config and 
-                    device_config['serial_number'] == device['serial_number']) or
+                    device['serial_number'] == device_config['serial_number']) or
                     ('id' in device_config and 
-                    device_config['id'] == device['id'])):
+                    device['id'] == device_config['id'])):
                     
                     self.image_acquirer = self.harvester.create(idx)
-                    logger.info(f"Connected to device at index {idx}")
+                    logger.info(f"Connected to device {idx}: Name = {device['user_defined_name']}; Model = {device['model']}; S/N = {device['serial_number']}")
                     self._is_connected = True
                     return self.image_acquirer
 
@@ -187,14 +187,14 @@ class TransportHarvesters:
             if self.image_acquirer:
                 self.image_acquirer.destroy()
                 self.image_acquirer = None
-                logger.info("Image acquirer destroyed.")
+                logger.debug("Image acquirer destroyed.")
             
             if self.harvester:
                 self.harvester.reset()
                 self.harvester = None
-                logger.info("Harvester reset.")
+                logger.debug("Harvester released.")
             
-            logger.info(f"{self.__class__.__name__} disconnected successfully.")
+            logger.debug(f"{self.__class__.__name__} disconnected successfully.")
             self._is_acquiring = False
             self._is_connected = False
         except Exception as e:
@@ -218,7 +218,7 @@ class TransportHarvesters:
             assert self.image_acquirer is not None
             self.image_acquirer.start()
             self._is_acquiring = True
-            logger.info("Acquisition started.")
+            logger.debug("Acquisition started.")
         except Exception as e:
             raise CameraError(f"Failed to start acquisition: {e}")
 
@@ -235,7 +235,7 @@ class TransportHarvesters:
             assert self.image_acquirer is not None
             self.image_acquirer.stop()
             self._is_acquiring = False
-            logger.info("Acquisition stopped.")
+            logger.debug("Acquisition stopped.")
         except Exception as e:
             raise CameraError(f"Failed to stop acquisition: {e}")
 
@@ -264,6 +264,7 @@ class TransportHarvesters:
                 # Return list of components from buffer payload
                 components = list(buffer.payload.components)
                 logger.debug(f"Fetched frame with {len(components)} component(s).")
+                logger.debug(f"Components payload: {components}")
                 return components
                 
         except Exception as e:

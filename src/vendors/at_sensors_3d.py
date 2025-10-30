@@ -15,7 +15,9 @@ logger = get_logger("CameraATSensors3D")
 
 class CameraATSensors3D(CameraBase):
     """
-    AT Sensors 3D camera implementation.
+    AT Sensors 3D GenICam interface with Harvesters SDK.
+
+    Inherits from CameraBase and implements vendor-specific methods.
     """    
 
     # GenICam node names specific to AT Sensors cameras
@@ -37,33 +39,33 @@ class CameraATSensors3D(CameraBase):
             config (dict): Configuration dictionary passed to CameraBase
         """
         super().__init__(config=config)        
-        logger.info(f"{self.__class__.__name__} initialized")
+        logger.debug(f"{self.__class__.__name__} initialized.")
 
 
     # -------------------------------
     # Vendor specific parameter handling
-    # -------------------------------    
+    # -------------------------------
     def set_exposure_time(self, exposure_us: float) -> None:
         """
-        Set exposure time in microseconds.
+        Set exposure time in microseconds [us].
         
         Args:
-            exposure_us (float): Exposure time in microseconds
+            exposure_us (float): Exposure time in microseconds [us]
         """
         self.set_parameter(self.NODES["exposure"], exposure_us)
 
     def get_exposure_time(self) -> float:
         """
-        Get current exposure time in microseconds.
+        Get current exposure time in microseconds [us].
         
         Returns:
-            float: Current exposure time in microseconds
+            float: Current exposure time in microseconds [us]
         """
         return self.get_parameter(self.NODES["exposure"])
 
     def set_gain(self, gain: float) -> None:
         """
-        Set sensor gain.
+        Set sensor gain value.
         
         Args:
             gain (float): Gain value
@@ -72,7 +74,7 @@ class CameraATSensors3D(CameraBase):
 
     def get_gain(self) -> float:
         """
-        Get current sensor gain.
+        Get current sensor gain value.
         
         Returns:
             float: Current gain value
