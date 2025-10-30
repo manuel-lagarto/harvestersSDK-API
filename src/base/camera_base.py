@@ -138,7 +138,7 @@ class CameraBase(ABC):
         except Exception as e:
             raise CameraError(f"Failed to stop acquisition: {e}")
 
-    def get_frame(self, timeout_ms: Optional[int] = None) -> Any:
+    def get_frame(self, timeout_ms: Optional[int] = 5000) -> Any:
         """
         Capture a single frame from the camera using the transport layer.
         

@@ -11,9 +11,9 @@ from typing import Optional
 
 def setup_logging(
     level: int = logging.INFO,
-    log_file: Optional[str] = "logs/harvesters_sdk.log",
+    log_file: Optional[str] = "harvesters_sdk.log",
     log_format: str = "[%(asctime)s] [%(levelname)s] %(name)s: %(message)s",
-    date_format: str = "%H:%M:%S"
+    date_format: str = "%Y-%m-%d %H:%M:%S"
 ) -> None:
     """
     Configure global logging for the SDK.

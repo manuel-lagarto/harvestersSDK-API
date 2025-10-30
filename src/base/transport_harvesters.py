@@ -287,7 +287,7 @@ class TransportHarvesters:
             
         try:
             node = self.image_acquirer.remote_device.node_map.get_node(node_name)
-            if node and node.is_writable:
+            if node:
                 node.value = value
                 logger.debug(f"Node {node_name} set to {value}")
             else:
@@ -310,7 +310,7 @@ class TransportHarvesters:
             
         try:
             node = self.image_acquirer.remote_device.node_map.get_node(node_name)
-            if node and node.is_readable:
+            if node:
                 return node.value
             else:
                 raise CameraError(f"Node {node_name} is not readable")
