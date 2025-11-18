@@ -54,9 +54,12 @@ camera.set_exposure_time(original_exposure_time)
 exposure_time = camera.get_exposure_time()
 print(f"Exposure time: {exposure_time}")
 
+# Start acquisition and get a frame from camera buffer
 camera.start_acquisition()
 frame = camera.get_frame(timeout_ms=10000)
-print(frame)
 camera.stop_acquisition()
+
+# Work with captured frame
+print(frame)
 
 camera.disconnect()

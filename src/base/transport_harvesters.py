@@ -70,19 +70,22 @@ class TransportHarvesters:
             List of device info dictionaries
         """
         if not self.harvester:
-            self.initialize()
-            assert self.harvester is not None
+            try:
+                self.initialize()
+            except CameraError as e:
+                logger.exception("Failed to initialize Harvester while listing devices.")
+                return []        
+        assert self.harvester is not None
+        
+        if self.devices_list:
+            self.devices_list = []
 
         # Update list of devices
         self.harvester.update()
         
-        if not self.harvester or not self.harvester.device_info_list:
+        if not self.harvester.device_info_list:
             logger.error("No devices found.")
-            self.devices_list = []
-            return self.devices_list
-        
-        if self.devices_list:
-            self.devices_list = []
+            return []
 
         for idx, device_info in enumerate(self.harvester.device_info_list):
             self.devices_list.append({
