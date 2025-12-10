@@ -90,7 +90,7 @@ class TransportHarvesters:
                 if raise_on_error:
                     raise
                 return []
-        assert self.harvester is not None
+        # assert self.harvester is not None # remove: resets ia content
 
         # Update list of devices
         try:
@@ -138,7 +138,12 @@ class TransportHarvesters:
         """
         if self.harvester is None:
             self.initialize()
-        assert self.harvester is not None
+        # assert self.harvester is not None # remove: resets ia content
+        
+        # Update device list
+        # self.harvester.update()
+        # if not self.harvester.device_info_list:
+        #     raise CameraError("No devices found by Harvester.")
         
         try:
             ia = self.harvester.create(selector)

@@ -24,12 +24,17 @@ from harvestersSDK_api import create_camera, list_supported_cameras
 
 print("Supported cameras:", list_supported_cameras())
 
+# device_name = devices[0]['user_defined_name']
+device_name = '21815765S'
+print(f"Using device: {device_name}")
+
 # Configuration dictionary
 config = {
     "cti_path": CTI_PATH,
-    "device_name": 'C6-21815221',
+    "device_name": device_name,
     # "device_serial" "target_serial_number_here",
     # "device_id" "target_id_here",
+    "timeout_ms": 5000,
 }
 
 

@@ -27,7 +27,7 @@ print("Supported cameras:", list_supported_cameras())
 # Configuration dictionary
 config = {
     "cti_path": CTI_PATH,
-    "device_name": 'C6-21815221',
+    "device_name": '21815765S',
     # "device_serial" "target_serial_number_here",
     # "device_id" "target_id_here",
 }

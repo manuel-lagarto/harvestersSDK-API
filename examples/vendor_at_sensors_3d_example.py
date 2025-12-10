@@ -27,28 +27,49 @@ import open3d as o3d
 from harvestersSDK_api import create_camera, list_supported_cameras
 from src.utils.point_cloud_processing import *
 
+print("=" * 70)
+print("DUAL-SENSOR ACQUISITION EXAMPLE (AT Sensors 3D)")
+print("=" * 70)
+
 # Change to True to save a frame dump from the camera
 SAVE_FRAME = False
 
+# Change to True to save a frame dump from the camera
+VISUALIZATION = True
+
 # Paths configuration
 save_suffix = "scan0"
-
-frame_dump = f"./_frame_dumps/example_saves/frame_dump_{save_suffix}.pkl"
-pcd_out = f"./_point_clouds/example_saves/point_cloud_{save_suffix}.xyz"
+frame_dump_primary = f"./_frame_dumps/example_saves/frame_dump_primary_{save_suffix}.pkl"
+frame_dump_secondary = f"./_frame_dumps/example_saves/frame_dump_secondary_{save_suffix}.pkl"
+pcd_primary_out = f"./_point_clouds/example_saves/point_cloud_primary_{save_suffix}.xyz"
+pcd_secondary_out = f"./_point_clouds/example_saves/point_cloud_secondary_{save_suffix}.xyz"
 
 
 #--------------------------------------------------------------------------
-# Camera configuration
+# Device Discovery and Configuration
 #--------------------------------------------------------------------------
+print("\nSupported cameras:", list_supported_cameras())
+
+# Discover available devices
+# print("\nDiscovering devices...")
+# devices = discover_devices(CTI_PATH)
+# if len(devices) < 2:
+#     print(f"Error: Need at least 2 devices for dual-sensor mode. Found: {len(devices)}")
+#     sys.exit(1)
+
+primary_name = '21815765M'
+secondary_name = '21815765S'
+# print(f"Found {len(devices)} device(s):")
+print(f"  Primary:   {primary_name}")
+print(f"  Secondary: {secondary_name}")
+
 # Configuration dictionary
 config = {
     "cti_path": CTI_PATH,
-    "device_name": '21815765M',
-    # "device_serial" "target_serial_number_here",
-    # "device_id" "target_id_here",
+    "timeout_ms": 5000,
 }
 
-# C6-4090-MCS-420-530-D2-1G calibration dictionary
+# C6-4090-MCS-420-530-D2-1G calibration dictionary (same for both sensors)
 camera_calibration = {
     "scale_z": 0.0625,         # Sensor C-scaler
     "pixel_to_mm_x": 0.0875,   # X scaling calibration
@@ -60,43 +81,93 @@ camera_calibration = {
 #--------------------------------------------------------------------------
 # AT Sensors 3D Acquisition Example
 #--------------------------------------------------------------------------
-print("Supported cameras:", list_supported_cameras())
+print("\nCreating camera instance...")
 camera = create_camera("at_sensors_3d", config_dict=config)
 
-camera.connect()
+print("Setting up dual-sensor mode...")
+camera.setup(
+    dual_configuration=True,
+    device_selectors=[
+        {'user_defined_name': primary_name},
+        {'user_defined_name': secondary_name}
+    ]
+)
 
-# Start acquisition and get a frame from camera buffer
-camera.start_acquisition()
-frame = camera.get_frame(timeout_ms=10000)
-camera.stop_acquisition()
+print("\nAcquiring dual frames with automatic lifecycle management...")
+print("  (start_dual_acquisition -> get_frames_dual -> stop_dual_acquisition)")
+try:
+    # Use acquire_frames_dual() with automatic lifecycle
+    frames = camera.acquire_frames_dual(timeout_ms=5000)
+    
+    primary_frame = frames['primary']
+    secondary_frame = frames['secondary']
+    
+    print(f"\n✓ Dual frames acquired successfully!")
+    print(f"\n  Primary sensor:")
+    print(f"    Components: {len(primary_frame)}")
+    if primary_frame:
+        print(f"    Resolution: {primary_frame[0]['width']} x {primary_frame[0]['height']}")
+        print(f"    Data format: {primary_frame[0]['data_format']}")
+    
+    print(f"\n  Secondary sensor:")
+    print(f"    Components: {len(secondary_frame)}")
+    if secondary_frame:
+        print(f"    Resolution: {secondary_frame[0]['width']} x {secondary_frame[0]['height']}")
+        print(f"    Data format: {secondary_frame[0]['data_format']}")
+    
+except Exception as e:
+    print(f"\n✗ Acquisition failed: {e}")
+    sys.exit(1)
 
-# Work with captured frame
-print(frame)
-
+# Cleanup
+print("\nDisconnecting...")
 camera.disconnect()
+print("✓ Done!")
 
 
 #--------------------------------------------------------------------------
 # AT Sensors 3D Frame Manipulation Example
 #--------------------------------------------------------------------------
-# Work with captured frame
-print(frame)
+print("\n" + "=" * 70)
+print("POINT CLOUD PROCESSING")
+print("=" * 70)
 
-if SAVE_FRAME == True:
-    save_frame_dump(frame, frame_dump)
-    frame = open_frame_dump(frame_dump)
+if SAVE_FRAME:
+    print("\nSaving frame dumps...")
+    save_frame_dump(primary_frame, frame_dump_primary)
+    save_frame_dump(secondary_frame, frame_dump_secondary)
+    print(f"  Primary:   {frame_dump_primary}")
+    print(f"  Secondary: {frame_dump_secondary}")
 
-# Build point cloud
-pcd = build_point_cloud_from_frame(
-    frame,
-    flip_yx=False
+print("\nBuilding point clouds from frames...")
+
+# Build point cloud from primary sensor
+pcd_primary = build_point_cloud_from_frame(
+    primary_frame,
+    flip_yx=False,
+    camera_calibration=camera_calibration
 )
-save_point_cloud_data(pcd, pcd_out)
+save_point_cloud_data(pcd_primary, pcd_primary_out)
+print(f"  Primary:   {pcd_primary_out} ({pcd_primary.shape[0]} points)")
+
+# Build point cloud from secondary sensor (flip_yx=True for 180° rotation)
+pcd_secondary = build_point_cloud_from_frame(
+    secondary_frame,
+    flip_yx=True,  # Mirror for dual-sensor alignment
+    camera_calibration=camera_calibration
+)
+save_point_cloud_data(pcd_secondary, pcd_secondary_out)
+print(f"  Secondary: {pcd_secondary_out} ({pcd_secondary.shape[0]} points)")
 
 
 #--------------------------------------------------------------------------
 # Open3D Visualization (optional)
 #--------------------------------------------------------------------------
-pcd_master_o3d = o3d.geometry.PointCloud()
-pcd_master_o3d.points = o3d.utility.Vector3dVector(pcd)
-visualize_point_cloud([pcd_master_o3d], "AT Sensors Example Point Cloud")
+if VISUALIZATION:
+    pcd_master_o3d = o3d.geometry.PointCloud()
+    pcd_master_o3d.points = o3d.utility.Vector3dVector(pcd_primary)
+    visualize_point_cloud([pcd_master_o3d], "AT Sensors Example: Master Point Cloud")
+
+    pcd_slave_o3d = o3d.geometry.PointCloud()
+    pcd_slave_o3d.points = o3d.utility.Vector3dVector(pcd_secondary)
+    visualize_point_cloud([pcd_slave_o3d], "AT Sensors Example: Slave Point Cloud")

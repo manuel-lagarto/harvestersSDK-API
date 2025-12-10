@@ -174,7 +174,7 @@ class CameraBase(ABC):
             return
         
         try:
-            self._transport.start_image_acquirer(ia)
+            self._transport.start_image_acquirer(self._acquirers[acquirer_index])
             self._acquiring_states[id(ia)] = True
             logger.info(f"Started acquisition on acquirer {acquirer_index}.")
         except Exception as e:
