@@ -36,7 +36,7 @@ print("\nSupported cameras:", list_supported_cameras())
 #     sys.exit(1)
 
 # device_name = devices[0]['user_defined_name']
-device_name = '21815765S'
+device_name = '21815765M'
 print(f"Using device: {device_name}")
 
 # Configuration dictionary

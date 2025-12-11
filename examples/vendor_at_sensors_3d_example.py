@@ -108,12 +108,14 @@ try:
     if primary_frame:
         print(f"    Resolution: {primary_frame[0]['width']} x {primary_frame[0]['height']}")
         print(f"    Data format: {primary_frame[0]['data_format']}")
+        print(primary_frame[0])
     
     print(f"\n  Secondary sensor:")
     print(f"    Components: {len(secondary_frame)}")
     if secondary_frame:
         print(f"    Resolution: {secondary_frame[0]['width']} x {secondary_frame[0]['height']}")
         print(f"    Data format: {secondary_frame[0]['data_format']}")
+        print(secondary_frame[0])
     
 except Exception as e:
     print(f"\n✗ Acquisition failed: {e}")
