@@ -31,8 +31,8 @@ from harvestersSDK_api import create_camera, list_supported_cameras
 from src.utils.point_cloud_processing import *
 
 # Example settings
-SAVE_FRAME = True
-SAVE_CLOUD = True
+SAVE_FRAME = False
+SAVE_CLOUD = False
 VISUALIZATION = True
 
 # Paths configuration
@@ -105,7 +105,7 @@ except Exception as e:
     sys.exit(1)
 
 # 4. Disconnect from camera & cleanup
-print("Disconnecting...")
+print("\nDisconnecting...")
 camera.disconnect()
 print("✓ Done!")
 
@@ -122,20 +122,20 @@ primary_frame = frames['primary']
 secondary_frame = frames['secondary']
 
 # Display results for primary sensor (master)
-print(f"\n   Primary sensor:")
-print(f"      Components: {len(primary_frame)}")
+print(f"\n   Primary frame:")
+print(f"      Components:  {len(primary_frame)}")
 if primary_frame:
-    print(f"    Resolution: {primary_frame[0]['width']} x {primary_frame[0]['height']}")
-    print(f"    Data format: {primary_frame[0]['data_format']}")
-    print(primary_frame[0])
+    print(f"      Resolution:  {primary_frame[0]['width']} x {primary_frame[0]['height']}")
+    print(f"      Data format: {primary_frame[0]['data_format']}")
+    print(f"      Frame data:  {primary_frame[0]}")
 
 # Display results for secondary sensor (slave)
-print(f"\n   Secondary sensor:")
-print(f"      Components: {len(secondary_frame)}")
+print(f"\n   Secondary frame:")
+print(f"      Components:  {len(secondary_frame)}")
 if secondary_frame:
-    print(f"    Resolution: {secondary_frame[0]['width']} x {secondary_frame[0]['height']}")
-    print(f"    Data format: {secondary_frame[0]['data_format']}")
-    print(secondary_frame[0])
+    print(f"      Resolution:  {secondary_frame[0]['width']} x {secondary_frame[0]['height']}")
+    print(f"      Data format: {secondary_frame[0]['data_format']}")
+    print(f"      Frame data:  {secondary_frame[0]}")
 
 # Save frame dumps
 if SAVE_FRAME:
@@ -161,7 +161,7 @@ pcd_primary = build_point_cloud_from_frame(
     flip_yx=False,
     camera_calibration=camera_calibration
 )
-print(f"  Primary:   {pcd_primary_out} ({pcd_primary.shape[0]} points)")
+print(f"  Primary point cloud: {pcd_primary_out} ({pcd_primary.shape[0]} points)")
 
 print()
 # Build point cloud from secondary sensor (flip_yx=True for 180° rotation)
@@ -170,7 +170,7 @@ pcd_secondary = build_point_cloud_from_frame(
     flip_yx=True,  # Mirror for dual-sensor alignment
     camera_calibration=camera_calibration
 )
-print(f"  Secondary: {pcd_secondary_out} ({pcd_secondary.shape[0]} points)")
+print(f"  Secondary point cloud: {pcd_secondary_out} ({pcd_secondary.shape[0]} points)")
 
 end_process = time.perf_counter()
 

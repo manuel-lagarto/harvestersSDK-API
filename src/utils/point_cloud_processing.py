@@ -127,7 +127,7 @@ def visualize_point_cloud(pcd_list, title="Point Cloud"):
     )
     logger.info(f"Loaded {title} for visualization with {len(pcd_list)} objects.")
     for idx, pcd in enumerate(pcd_list):
-        logger.debug(f"- Object {idx}:  {len(pcd.points)} points")
+        logger.debug(f"{title} object {idx}:  {len(pcd.points)} points")
         
     o3d.visualization.draw_geometries(pcd_list, # type: ignore
                                       window_name=title,
