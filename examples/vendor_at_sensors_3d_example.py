@@ -5,6 +5,9 @@ import platform
 import sys
 import os
 
+import time
+start_total = time.perf_counter()
+
 # Change CTI_PATH as needed for the target GenTL producer
 if platform.system() == "Windows":
     CTI_PATH = r"C:/Program Files/Balluff/ImpactAcquire/bin/x64/mvGenTLProducer.cti"
@@ -32,13 +35,16 @@ print("DUAL-SENSOR ACQUISITION EXAMPLE (AT Sensors 3D)")
 print("=" * 70)
 
 # Change to True to save a frame dump from the camera
-SAVE_FRAME = False
+SAVE_FRAME = True
 
-# Change to True to save a frame dump from the camera
+# Change to True to save a point cloud
+SAVE_CLOUD = True
+
+# Change to True to visualize the point cloud with Open3D
 VISUALIZATION = True
 
 # Paths configuration
-save_suffix = "scan0"
+save_suffix = "part1_scan0"
 frame_dump_primary = f"./_frame_dumps/example_saves/frame_dump_primary_{save_suffix}.pkl"
 frame_dump_secondary = f"./_frame_dumps/example_saves/frame_dump_secondary_{save_suffix}.pkl"
 pcd_primary_out = f"./_point_clouds/example_saves/point_cloud_primary_{save_suffix}.xyz"
@@ -48,7 +54,7 @@ pcd_secondary_out = f"./_point_clouds/example_saves/point_cloud_secondary_{save_
 #--------------------------------------------------------------------------
 # Device Discovery and Configuration
 #--------------------------------------------------------------------------
-print("\nSupported cameras:", list_supported_cameras())
+print("Supported cameras:", list_supported_cameras())
 
 # Discover available devices
 # print("\nDiscovering devices...")
@@ -74,7 +80,7 @@ camera_calibration = {
     "scale_z": 0.0625,         # Sensor C-scaler
     "pixel_to_mm_x": 0.0875,   # X scaling calibration
     "pixel_to_mm_z": 0.1955,   # Z scaling calibration
-    "stretch_y": 0.8,          # Y distance scaling
+    "stretch_y": 1.0,          # Y distance scaling
 }
 
 
@@ -82,9 +88,11 @@ camera_calibration = {
 # AT Sensors 3D Acquisition Example
 #--------------------------------------------------------------------------
 print("\nCreating camera instance...")
+start_connect = time.perf_counter()
+
 camera = create_camera("at_sensors_3d", config_dict=config)
 
-print("Setting up dual-sensor mode...")
+# print("Setting up dual-sensor mode...")
 camera.setup(
     dual_configuration=True,
     device_selectors=[
@@ -92,12 +100,15 @@ camera.setup(
         {'user_defined_name': secondary_name}
     ]
 )
+end_connect = time.perf_counter()
 
 print("\nAcquiring dual frames with automatic lifecycle management...")
 print("  (start_dual_acquisition -> get_frames_dual -> stop_dual_acquisition)")
 try:
     # Use acquire_frames_dual() with automatic lifecycle
+    start_acquire = time.perf_counter()
     frames = camera.acquire_frames_dual(timeout_ms=5000)
+    end_acquire = time.perf_counter()
     
     primary_frame = frames['primary']
     secondary_frame = frames['secondary']
@@ -142,6 +153,7 @@ if SAVE_FRAME:
     print(f"  Secondary: {frame_dump_secondary}")
 
 print("\nBuilding point clouds from frames...")
+start_process = time.perf_counter()
 
 # Build point cloud from primary sensor
 pcd_primary = build_point_cloud_from_frame(
@@ -149,7 +161,6 @@ pcd_primary = build_point_cloud_from_frame(
     flip_yx=False,
     camera_calibration=camera_calibration
 )
-save_point_cloud_data(pcd_primary, pcd_primary_out)
 print(f"  Primary:   {pcd_primary_out} ({pcd_primary.shape[0]} points)")
 
 # Build point cloud from secondary sensor (flip_yx=True for 180° rotation)
@@ -158,9 +169,15 @@ pcd_secondary = build_point_cloud_from_frame(
     flip_yx=True,  # Mirror for dual-sensor alignment
     camera_calibration=camera_calibration
 )
-save_point_cloud_data(pcd_secondary, pcd_secondary_out)
 print(f"  Secondary: {pcd_secondary_out} ({pcd_secondary.shape[0]} points)")
 
+end_process = time.perf_counter()
+
+if SAVE_CLOUD:
+    save_point_cloud_data(pcd_primary, pcd_primary_out)
+    save_point_cloud_data(pcd_secondary, pcd_secondary_out)
+
+end_total = time.perf_counter()
 
 #--------------------------------------------------------------------------
 # Open3D Visualization (optional)
@@ -173,3 +190,15 @@ if VISUALIZATION:
     pcd_slave_o3d = o3d.geometry.PointCloud()
     pcd_slave_o3d.points = o3d.utility.Vector3dVector(pcd_secondary)
     visualize_point_cloud([pcd_slave_o3d], "AT Sensors Example: Slave Point Cloud")
+    
+#---------------------------------------------------------------------------
+# Time Statistics
+#---------------------------------------------------------------------------
+print("\n" + "=" * 70)
+print("TIME STATISTICS")
+print("=" * 70)
+print(f"Camera connection:      {end_connect - start_connect:.4f} s")
+print(f"Frame acquisition:      {end_acquire - start_acquire:.4f} s")
+print(f"Point cloud processing: {end_process - start_process:.4f} s")
+print("-" * 70)
+print(f"Total time:             {end_total - start_total:.4f} s")

@@ -78,8 +78,8 @@ class CameraATSensors3D(CameraBase):
             if not device_selectors or len(device_selectors) < 2:
                 raise CameraError("Dual configuration requires 2 device selectors.")
             
-            self.connect(device_selector=device_selectors[0])  # index 0 (primary)
             self.connect(device_selector=device_selectors[1])  # index 1 (secondary)
+            self.connect(device_selector=device_selectors[0])  # index 0 (primary)
             logger.info("Configured dual-sensor mode (acquirers 0 and 1).")
         except Exception as e:
             logger.exception("setup failed.")

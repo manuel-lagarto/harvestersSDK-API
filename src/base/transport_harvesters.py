@@ -190,25 +190,25 @@ class TransportHarvesters:
         Raises AcquisitionError on failure.
         """
         try:
-            if timeout_ms is not None:
-                ctx = ia.fetch(timeout=int(timeout_ms / 1000.0))
-            else:
-                ctx = ia.fetch()
-            with ctx as buffer:  # type: ignore
-                payload = getattr(buffer, "payload", None)
-                if payload is None:
+            # if timeout_ms is not None:
+            #     ctx = ia.fetch(timeout=int(timeout_ms / 1000.0))
+            # else:
+            #     ctx = ia.fetch()
+            with ia.fetch() as buffer:  # type: ignore
+                if buffer.payload is None:
                     raise AcquisitionError("Fetched buffer has no payload.")
                 comps_out = []
-                for comp in payload.components:
+                for comp in buffer.payload.components:
                     comps_out.append({
-                        "width": getattr(comp, "width", None),
-                        "height": getattr(comp, "height", None),
-                        "data": getattr(comp, "data", None),
-                        "dtype": getattr(getattr(comp, "data", None), "dtype", None),
-                        "data_format": getattr(comp, "data_format", None),
+                        "width": comp.width,
+                        "height": comp.height,
+                        "data": comp.data.copy(),
+                        "dtype": comp.data.dtype,
+                        "data_format": comp.data_format,
                         "component_type": type(comp).__name__,
                     })
                 logger.debug(f"Fetched {len(comps_out)} component(s) from acquirer.")
+                logger.debug(f"Components payload: {comps_out}")
                 return comps_out
         except AcquisitionError:
             raise

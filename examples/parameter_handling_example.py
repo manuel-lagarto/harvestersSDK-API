@@ -27,7 +27,7 @@ print("Supported cameras:", list_supported_cameras())
 # Configuration dictionary
 config = {
     "cti_path": CTI_PATH,
-    "device_name": '21815765S',
+    "device_name": '21815765M',
     # "device_serial" "target_serial_number_here",
     # "device_id" "target_id_here",
 }
@@ -39,6 +39,14 @@ config = {
 camera = create_camera("at_sensors_3d", config_dict=config)
 
 camera.connect()
+
+# camera.set_parameter("RegionSelector", "Region0")
+# original_height = camera.get_parameter("Height")
+# print(f"Region height: {original_height}")
+
+# camera.set_parameter("RegionSelector", "Scan3dExtraction0")
+# original_height = camera.get_parameter("Height")
+# print(f"Region height: {original_height}")
 
 # Get exposure time node value
 original_exposure_time = camera.get_exposure_time()
