@@ -134,6 +134,7 @@ def process_point_clouds(frames, scan_suffix="scan0"):
     # Configure paths
     pcd_primary_out = f"./_point_clouds/point_cloud_primary_{scan_suffix}.xyz"
     pcd_secondary_out = f"./_point_clouds/point_cloud_secondary_{scan_suffix}.xyz"
+    pcd_combined_out = f"./_point_clouds/point_cloud_combined_{scan_suffix}.xyz"
 
     # Save separate frames for later processing
     primary_frame = frames['primary']
@@ -158,6 +159,9 @@ def process_point_clouds(frames, scan_suffix="scan0"):
     )
     print(f"  Secondary point cloud: {pcd_secondary_out} ({pcd_secondary.shape[0]} points)")
     
+    # Combine point clouds
+    pcd_combined = np.vstack([pcd_primary, pcd_secondary])
+    
     elapsed_process = time.perf_counter() - start_process
 
     # Save point clouds
@@ -165,8 +169,10 @@ def process_point_clouds(frames, scan_suffix="scan0"):
         print("\nSaving point clouds...")
         save_point_cloud_data(pcd_primary, pcd_primary_out)
         save_point_cloud_data(pcd_secondary, pcd_secondary_out)
+        save_point_cloud_data(pcd_combined, pcd_combined_out)
         print(f"  Primary point cloud:   {pcd_primary_out}")
         print(f"  Secondary point cloud: {pcd_secondary_out}")
+        print(f"  Combined point cloud:  {pcd_combined_out}")
     
     # Visualize
     if VISUALIZATION:
@@ -174,13 +180,17 @@ def process_point_clouds(frames, scan_suffix="scan0"):
         print("POINT CLOUD VISUALIZATION")
         print("=" * 70)
 
-        pcd_master_o3d = o3d.geometry.PointCloud()
-        pcd_master_o3d.points = o3d.utility.Vector3dVector(pcd_primary)
-        visualize_point_cloud([pcd_master_o3d], "AT Sensors Example: Master Point Cloud")
+        # pcd_master_o3d = o3d.geometry.PointCloud()
+        # pcd_master_o3d.points = o3d.utility.Vector3dVector(pcd_primary)
+        # visualize_point_cloud([pcd_master_o3d], "AT Sensors Example: Master Point Cloud")
 
-        pcd_slave_o3d = o3d.geometry.PointCloud()
-        pcd_slave_o3d.points = o3d.utility.Vector3dVector(pcd_secondary)
-        visualize_point_cloud([pcd_slave_o3d], "AT Sensors Example: Slave Point Cloud")
+        # pcd_slave_o3d = o3d.geometry.PointCloud()
+        # pcd_slave_o3d.points = o3d.utility.Vector3dVector(pcd_secondary)
+        # visualize_point_cloud([pcd_slave_o3d], "AT Sensors Example: Slave Point Cloud")
+
+        pcd_combined_o3d = o3d.geometry.PointCloud()
+        pcd_combined_o3d.points = o3d.utility.Vector3dVector(pcd_combined)
+        visualize_point_cloud([pcd_combined_o3d], "AT Sensors Example: Combined Point Cloud")
 
 
     print("\n" + "=" * 70)
