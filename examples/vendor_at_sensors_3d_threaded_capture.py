@@ -7,8 +7,6 @@ import os
 import time
 import threading
 
-start_total = time.perf_counter()
-
 # Setup paths
 if platform.system() == "Windows":
     CTI_PATH = r"C:/Program Files/Balluff/ImpactAcquire/bin/x64/mvGenTLProducer.cti"
@@ -160,7 +158,7 @@ def process_point_clouds(frames, scan_suffix="scan0"):
     )
     print(f"  Secondary point cloud: {pcd_secondary_out} ({pcd_secondary.shape[0]} points)")
     
-    end_process = time.perf_counter()
+    elapsed_process = time.perf_counter() - start_process
 
     # Save point clouds
     if SAVE_CLOUD:
@@ -169,7 +167,6 @@ def process_point_clouds(frames, scan_suffix="scan0"):
         save_point_cloud_data(pcd_secondary, pcd_secondary_out)
         print(f"  Primary point cloud:   {pcd_primary_out}")
         print(f"  Secondary point cloud: {pcd_secondary_out}")
-    end_total = time.perf_counter()
     
     # Visualize
     if VISUALIZATION:
@@ -190,11 +187,12 @@ def process_point_clouds(frames, scan_suffix="scan0"):
     print("TIME STATISTICS")
     print("=" * 70)
 
-    print(f"Camera connection:      {end_connect - start_connect:.4f} s")
-    print(f"Frame acquisition:      {end_acquire - start_acquire:.4f} s")
-    print(f"Point cloud processing: {end_process - start_process:.4f} s")
+    print(f"Camera connection:      {elapsed_connect:.4f} s")
+    print(f"Frame acquisition:      {elapsed_acquire:.4f} s")
+    print(f"Point cloud processing: {elapsed_process:.4f} s")
     print("-" * 70)
-    print(f"Total time:             {end_total - start_total:.4f} s")
+    print(f"Total time:             {elapsed_connect+elapsed_acquire+elapsed_process:.4f} s")
+    print("\nPress 'c' to capture frame, 'q' to quit...")
 
 
 #--------------------------------------------------------------------------
@@ -215,9 +213,9 @@ if __name__ == "__main__":
             {'user_defined_name': device_name_secondary}
         ]
     )
-    end_connect = time.perf_counter()
+    elapsed_connect = time.perf_counter() - start_connect
     
-    print("Press 'c' to capture frame, 'q' to quit...\n")
+    print("\nPress 'c' to capture frame, 'q' to quit...")
     try:
         capture_count = 0
         while True:
@@ -230,7 +228,7 @@ if __name__ == "__main__":
                 capture_thread = CaptureThread(camera)
                 capture_thread.start()
                 capture_thread.join() # Wait for thread to finish
-                end_acquire = time.perf_counter()
+                elapsed_acquire = time.perf_counter() - start_acquire
 
                 # Process frames & build point clouds if capture was successful
                 if capture_thread.frames:
