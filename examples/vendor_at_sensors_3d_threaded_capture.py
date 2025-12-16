@@ -202,7 +202,6 @@ def process_point_clouds(frames, scan_suffix="scan0"):
     print(f"Point cloud processing: {elapsed_process:.4f} s")
     print("-" * 70)
     print(f"Total time:             {elapsed_connect+elapsed_acquire+elapsed_process:.4f} s")
-    print("\nPress 'c' to capture frame, 'q' to quit...")
 
 
 #--------------------------------------------------------------------------
@@ -245,6 +244,7 @@ if __name__ == "__main__":
                     capture_count += 1
                     process_frames(capture_thread.frames, scan_suffix=f"scan{capture_count}")
                     process_point_clouds(capture_thread.frames, scan_suffix=f"scan{capture_count}")
+                    print("\nPress 'c' to capture frame, 'q' to quit...")
                 
             elif key == 'q':
                 print("\nDisconnecting...")
