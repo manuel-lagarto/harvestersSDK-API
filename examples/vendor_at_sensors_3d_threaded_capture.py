@@ -132,9 +132,9 @@ def process_point_clouds(frames, scan_suffix="scan0"):
     print("=" * 70)
 
     # Configure paths
-    pcd_primary_out = f"./_saves/point_cloud_primary_{scan_suffix}.xyz"
-    pcd_secondary_out = f"./_saves/point_cloud_secondary_{scan_suffix}.xyz"
-    pcd_combined_out = f"./_saves/point_cloud_combined_{scan_suffix}.xyz"
+    pcd_primary_out = f"./_saves/pcd_primary_{scan_suffix}.xyz"
+    pcd_secondary_out = f"./_saves/pcd_secondary_{scan_suffix}.xyz"
+    pcd_combined_out = f"./_saves/pcd_combined_{scan_suffix}.xyz"
 
     # Save separate frames for later processing
     primary_frame = frames['primary']
@@ -241,9 +241,9 @@ if __name__ == "__main__":
 
                 # Process frames & build point clouds if capture was successful
                 if capture_thread.frames:
-                    capture_count += 1
                     process_frames(capture_thread.frames, scan_suffix=f"scan{capture_count}")
                     process_point_clouds(capture_thread.frames, scan_suffix=f"scan{capture_count}")
+                    capture_count += 1
                     print("\nPress 'c' to capture frame, 'q' to quit...")
                 
             elif key == 'q':
