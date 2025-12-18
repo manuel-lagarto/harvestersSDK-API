@@ -29,7 +29,7 @@ from src.utils.point_cloud_processing import *
 
 # Example settings
 SAVE_FRAME = False
-SAVE_CLOUD = False
+SAVE_CLOUD = True
 VISUALIZATION = True
 
 
@@ -94,8 +94,8 @@ def process_frames(frames, scan_suffix="scan0"):
     print("=" * 70)
 
     # Configure paths
-    frame_dump_primary = f"./_frame_dumps/frame_dump_primary_{scan_suffix}.pkl"
-    frame_dump_secondary = f"./_frame_dumps/frame_dump_secondary_{scan_suffix}.pkl"
+    frame_dump_primary = f"./_saves/frame_dump_primary_{scan_suffix}.pkl"
+    frame_dump_secondary = f"./_saves/frame_dump_secondary_{scan_suffix}.pkl"
     
     # Save separate frames for later processing
     primary_frame = frames['primary']
@@ -132,9 +132,9 @@ def process_point_clouds(frames, scan_suffix="scan0"):
     print("=" * 70)
 
     # Configure paths
-    pcd_primary_out = f"./_point_clouds/point_cloud_primary_{scan_suffix}.xyz"
-    pcd_secondary_out = f"./_point_clouds/point_cloud_secondary_{scan_suffix}.xyz"
-    pcd_combined_out = f"./_point_clouds/point_cloud_combined_{scan_suffix}.xyz"
+    pcd_primary_out = f"./_saves/point_cloud_primary_{scan_suffix}.xyz"
+    pcd_secondary_out = f"./_saves/point_cloud_secondary_{scan_suffix}.xyz"
+    pcd_combined_out = f"./_saves/point_cloud_combined_{scan_suffix}.xyz"
 
     # Save separate frames for later processing
     primary_frame = frames['primary']
@@ -167,11 +167,11 @@ def process_point_clouds(frames, scan_suffix="scan0"):
     # Save point clouds
     if SAVE_CLOUD:
         print("\nSaving point clouds...")
-        save_point_cloud_data(pcd_primary, pcd_primary_out)
-        save_point_cloud_data(pcd_secondary, pcd_secondary_out)
+        # save_point_cloud_data(pcd_primary, pcd_primary_out)
+        # save_point_cloud_data(pcd_secondary, pcd_secondary_out)
         save_point_cloud_data(pcd_combined, pcd_combined_out)
-        print(f"  Primary point cloud:   {pcd_primary_out}")
-        print(f"  Secondary point cloud: {pcd_secondary_out}")
+        # print(f"  Primary point cloud:   {pcd_primary_out}")
+        # print(f"  Secondary point cloud: {pcd_secondary_out}")
         print(f"  Combined point cloud:  {pcd_combined_out}")
     
     # Visualize
