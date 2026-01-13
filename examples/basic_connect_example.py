@@ -41,7 +41,7 @@ config = {
 #--------------------------------------------------------------------------
 # Basic Connection Handling Example
 #--------------------------------------------------------------------------
-camera = create_camera("at_sensors_3d", config_dict=config)
+camera = create_camera("21815765", config_path="./src/configs/config.json")
 
 camera.connect()
 camera.disconnect()

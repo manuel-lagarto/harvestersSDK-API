@@ -1,0 +1,47 @@
+{
+  "transport": {
+    "linux_cti_path": "/opt/cvb-14.01.008/drivers/genicam/libGevTL.cti",
+    "windows_cti_path": "C:/Program Files/Balluff/ImpactAcquire/bin/x64/mvGenTLProducer.cti"
+  },
+
+  "library": {
+    "log_level": "DEBUG",
+    "reconnect_max_attempts": 3
+  },
+
+  "cameras": {
+    "21815765": {
+      "vendor": "AT-Automation Technology GmbH",
+      "scanType": "Linescan3D",
+      "topology": "dual_sensor",      
+      "sensor_1": {
+        "user_defined_name": "21815765M",
+        "Calibration": {
+              "scale_z": 0.0625,
+              "pixel_to_mm_x": 0.0875,
+              "pixel_to_mm_z": 0.1955,
+              "stretch_y": 0.8
+            },
+        "timeout_ms": 10000,
+        "genicam_nodes": {
+          "ExposureTime": 500.0,
+          "Gain": 1.0
+        }
+      },      
+      "sensor_2": {
+        "user_defined_name": "21815765S",
+        "Calibration": {
+              "scale_z": 0.0625,
+              "pixel_to_mm_x": 0.0875,
+              "pixel_to_mm_z": 0.1955,
+              "stretch_y": 0.8
+            },
+        "timeout_ms": 10000,
+        "genicam_nodes": {
+          "ExposureTime": 500.0,
+          "Gain": 1.0
+        }
+      }
+    }
+  }
+}

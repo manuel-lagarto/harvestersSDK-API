@@ -11,7 +11,6 @@ from typing import Optional, List, Dict, Any, Tuple
 
 from src.vendors.at_sensors_3d import CameraATSensors3D
 from src.base.camera_base import CameraBase
-from src.base.transport_harvesters import TransportHarvesters
 from src.utils.error_handling import CameraError
 from src.utils.config_loader import ConfigLoader
 from src.utils.logging_utils import get_logger
@@ -21,18 +20,35 @@ from src.utils.logging_utils import get_logger
 logger = get_logger("API")
 
 # Supported cameras registry (add more as needed...)
-_CAMERA_REGISTRY = {
-    "at_sensors_3d": CameraATSensors3D,
+_CLASS_REGISTRY: Dict[tuple, type] = {
+    ("at-automation technology gmbh", "linescan3d", "dual_sensor"): CameraATSensors3D,
+    # ("hikrobot", "linescan2d", "single_sensor"): CameraHikrobotLineScan,
 }
+
+def _norm(s: Optional[str]) -> str:
+    return (s or "").strip().lower()
+
+def _pick_class(vendor: str, scan_type: str, topology: str) -> type:
+    key = (_norm(vendor), _norm(scan_type), _norm(topology))
+    cls = _CLASS_REGISTRY.get(key)
+    if not cls:
+        supported = [f"{v}|{st}|{tp}" for (v, st, tp) in _CLASS_REGISTRY.keys()]
+        raise CameraError(
+            f"Unsupported camera: vendor='{vendor}', scanType='{scan_type}', topology='{topology}'. "
+            f"Supported cameras: {supported}"
+        )
+    return cls
 
 
 # ---------------------------------------------------------------------
 # Factory function
 # ---------------------------------------------------------------------
 def create_camera(
-    camera_type: str,
-    config_paths: Optional[Tuple[str, str]] = None,
-    config_dict: Optional[Dict[str, Any]] = None
+    device_name_base: str,
+    config_path: Optional[str] = None,
+    vendor: Optional[str] = None,
+    scan_type: Optional[str] = None,
+    topology: Optional[str] = None
 ) -> CameraBase:
     """
     Factory function to create a camera instance based on vendor type.
@@ -53,44 +69,49 @@ def create_camera(
         >>> camera = create_camera("at_sensors_3d", config_dict=config)
         >>> camera.setup(dual_configuration=False, device_selectors=[0])
     """
-    logger.info(f"Creating camera of type: {camera_type}")
+    if not device_name_base:
+            raise CameraError("create_camera requires device_name_base.")
 
-    camera_class = _CAMERA_REGISTRY.get(camera_type.lower())
-    if not camera_class:
-        raise CameraError(
-            f"Unsupported camera type: '{camera_type}'. "
-            f"Supported types: {list_supported_cameras()}"
-        )
+    logger.info(f"Creating camera for the specified device name: {device_name_base}")
 
-    # Load configuration
-    if config_paths:
-        if not isinstance(config_paths, tuple) or len(config_paths) != 2:
-            raise CameraError("config_paths must be a tuple: (base_config_path, camera_config_path)")
-        base_config_path, camera_config_path = config_paths
-        loader = ConfigLoader(base_config_path=base_config_path, camera_config_path=camera_config_path)
-        config = loader.load()
-        logger.info(f"Configuration loaded from YAML files: {config_paths}")
-    elif config_dict:
-        config = config_dict
-        logger.info("Configuration loaded from provided dictionary.")
+    if config_path:
+        # Load .json configuration file from path
+        config_loader = ConfigLoader(config_path)
+        config_loader.load()
+
+        # Get configuration dictionaries
+        api_config_dict: Dict[str, Any]     = config_loader.get_api_config(device_name_base)
+        device_data_dict: Dict[str, Any]    = config_loader.get_device_data(device_name_base)
+        device_genicam_dict: Dict[str, Any] = config_loader.get_device_genicam(device_name_base)
+
+        # Get camera vendor specifications
+        vendor   = device_data_dict.get("vendor")
+        scanType = device_data_dict.get("scanType")
+        topology = device_data_dict.get("topology")
     else:
-        config = {}
-        logger.warning("No configuration provided; using empty default.")
+        logger.warning("No configuration file path provided! Using values from arguments.")
 
     # Create and return camera instance
     try:
-        camera = camera_class(config=config)
-        logger.info(f"Camera '{camera_type}' created successfully.")
+        camera_cls = _pick_class(vendor, scanType, topology) # type: ignore
+        camera = camera_cls(
+            api_config_dict=api_config_dict,
+            device_data_dict=device_data_dict,
+            device_genicam_dict=device_genicam_dict
+        )
+        logger.info(f"Camera '{device_name_base}' was initialized successfully!")
+        logger.debug(f"Camera info: vendor='{vendor}', scanType='{scanType}', topology='{topology}'")        
+        logger.debug(f"Camera configuration: '{device_data_dict}'")
         return camera
     except Exception as e:
-        logger.exception("Camera initialization failed.")
-        raise CameraError(f"Failed to initialize camera '{camera_type}': {e}")
+        logger.exception("Camera initialization failed!")
+        raise CameraError(f"Failed to initialize camera '{device_name_base}': {e}")
 
 
 # ---------------------------------------------------------------------
 # Device discovery
 # ---------------------------------------------------------------------
-def list_supported_cameras() -> List[str]:
+def list_supported_cameras():
     """
     List all supported camera vendor types.
 
@@ -102,10 +123,10 @@ def list_supported_cameras() -> List[str]:
         >>> print(cameras)
         ['at_sensors_3d']
     """
-    return list(_CAMERA_REGISTRY.keys())
+    return list(_CLASS_REGISTRY.keys())
 
 
-def discover_devices(cti_path: str, raise_on_error: bool = True) -> List[Dict[str, Any]]:
+def discover_devices(cti_path: str, raise_on_error: bool = True):
     """
     Discover all available GenICam devices connected to the system.
 
@@ -125,17 +146,8 @@ def discover_devices(cti_path: str, raise_on_error: bool = True) -> List[Dict[st
         >>> for dev in devices:
         ...     print(f"Device: {dev['user_defined_name']} (S/N: {dev['serial_number']})")
     """
-    logger.info(f"Discovering devices using CTI: {cti_path}")
-    try:
-        transport = TransportHarvesters(cti_path)
-        devices = transport.list_devices(raise_on_error=raise_on_error)
-        logger.info(f"Discovered {len(devices)} device(s).")
-        return devices
-    except Exception as e:
-        logger.exception("Device discovery failed.")
-        if raise_on_error:
-            raise CameraError(f"Failed to discover devices: {e}")
-        return []
+    # TODO: Request list of devices from CameraBase
+    pass
 
 
 # ---------------------------------------------------------------------
