@@ -317,6 +317,32 @@ class CameraBase(ABC):
 
 
     # -------------------------------
+    # Genicam parameter handling
+    # -------------------------------
+    def apply_genicam_parameters(self, genicam_dict: Dict[str, Any], acquirer_index: int = 0) -> None:
+        if not genicam_dict:
+            logger.debug("No GenICam parameters to apply.")
+            return
+        
+        logger.info(f"Applying {len(genicam_dict)} GenICam parameter(s) to acquirer {acquirer_index}...")
+        
+        failed_params = []
+        for param_name, param_value in genicam_dict.items():
+            try:
+                self.set_parameter(param_name, param_value, acquirer_index=acquirer_index)
+                logger.debug(f"Set parameter: {param_name} = {param_value}")
+            except ParameterError as e:
+                logger.warning(f"Failed to set parameter: {param_name}: {e}")
+                failed_params.append((param_name, str(e)))
+        
+        if failed_params:
+            error_msg = "; ".join([f"{name}: {err}" for name, err in failed_params])
+            logger.warning(f"Some parameters failed to set: {error_msg}")
+        else:
+            logger.info(f"All {len(genicam_dict)} parameters applied successfully!")
+
+
+    # -------------------------------
     # Context manager support
     # -------------------------------
     # def __enter__(self):

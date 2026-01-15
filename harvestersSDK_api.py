@@ -7,7 +7,7 @@ This module provides a high-level interface to create and manage cameras,
 abstracting away the internal implementation details.
 """
 
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Optional, List, Dict, Any, Tuple, overload, TypeVar, Type
 
 from src.vendors.at_sensors_3d import CameraATSensors3D
 from src.base.camera_base import CameraBase
@@ -19,6 +19,8 @@ from src.utils.logging_utils import get_logger
 # Logging configuration
 logger = get_logger("API")
 
+T = TypeVar('T', bound=CameraBase)
+
 # Supported cameras registry (add more as needed...)
 _CLASS_REGISTRY: Dict[tuple, type] = {
     ("at-automation technology gmbh", "linescan3d", "dual_sensor"): CameraATSensors3D,
@@ -26,18 +28,27 @@ _CLASS_REGISTRY: Dict[tuple, type] = {
 }
 
 def _norm(s: Optional[str]) -> str:
+    """Normalize string for comparison."""
     return (s or "").strip().lower()
 
 def _pick_class(vendor: str, scan_type: str, topology: str) -> type:
+    """Pick the appropriate camera class based on vendor specifications."""
     key = (_norm(vendor), _norm(scan_type), _norm(topology))
     cls = _CLASS_REGISTRY.get(key)
     if not cls:
         supported = [f"{v}|{st}|{tp}" for (v, st, tp) in _CLASS_REGISTRY.keys()]
-        raise CameraError(
-            f"Unsupported camera: vendor='{vendor}', scanType='{scan_type}', topology='{topology}'. "
-            f"Supported cameras: {supported}"
-        )
+        raise CameraError(f"Unsupported camera: {key}. Supported: {supported}")
     return cls
+
+
+# ---------------------------------------------------------------------
+# Type hints with @overload
+# ---------------------------------------------------------------------
+@overload
+def create_camera(device_name_base: str, config_path: str) -> CameraATSensors3D: ...
+
+@overload
+def create_camera(device_name_base: str, config_path: str) -> CameraBase: ...
 
 
 # ---------------------------------------------------------------------
@@ -45,10 +56,7 @@ def _pick_class(vendor: str, scan_type: str, topology: str) -> type:
 # ---------------------------------------------------------------------
 def create_camera(
     device_name_base: str,
-    config_path: Optional[str] = None,
-    vendor: Optional[str] = None,
-    scan_type: Optional[str] = None,
-    topology: Optional[str] = None
+    config_path: str
 ) -> CameraBase:
     """
     Factory function to create a camera instance based on vendor type.
@@ -69,12 +77,12 @@ def create_camera(
         >>> camera = create_camera("at_sensors_3d", config_dict=config)
         >>> camera.setup(dual_configuration=False, device_selectors=[0])
     """
-    if not device_name_base:
-            raise CameraError("create_camera requires device_name_base.")
+    if not device_name_base or not config_path:
+        raise CameraError("device_name_base and config_path arguments are required.")
 
     logger.info(f"Creating camera for the specified device name: {device_name_base}")
 
-    if config_path:
+    try:
         # Load .json configuration file from path
         config_loader = ConfigLoader(config_path)
         config_loader.load()
@@ -88,17 +96,13 @@ def create_camera(
         vendor   = device_data_dict.get("vendor")
         scanType = device_data_dict.get("scanType")
         topology = device_data_dict.get("topology")
-    else:
-        logger.warning("No configuration file path provided! Using values from arguments.")
 
-    # Create and return camera instance
-    try:
+        # Create and return camera instance
         camera_cls = _pick_class(vendor, scanType, topology) # type: ignore
-        camera = camera_cls(
-            api_config_dict=api_config_dict,
-            device_data_dict=device_data_dict,
-            device_genicam_dict=device_genicam_dict
-        )
+                
+        # Delegate to class factory method
+        camera = camera_cls.from_config(api_config_dict, device_data_dict, device_genicam_dict)
+
         logger.info(f"Camera '{device_name_base}' was initialized successfully!")
         logger.debug(f"Camera info: vendor='{vendor}', scanType='{scanType}', topology='{topology}'")        
         logger.debug(f"Camera configuration: '{device_data_dict}'")
@@ -112,40 +116,11 @@ def create_camera(
 # Device discovery
 # ---------------------------------------------------------------------
 def list_supported_cameras():
-    """
-    List all supported camera vendor types.
-
-    Returns:
-        List[str]: List of supported camera type identifiers.
-
-    Example:
-        >>> cameras = list_supported_cameras()
-        >>> print(cameras)
-        ['at_sensors_3d']
-    """
+    """List all supported camera types."""
     return list(_CLASS_REGISTRY.keys())
 
 
 def discover_devices(cti_path: str, raise_on_error: bool = True):
-    """
-    Discover all available GenICam devices connected to the system.
-
-    Args:
-        cti_path (str): Path to GenTL Producer (.cti) file.
-        raise_on_error (bool): If True, raise exceptions; if False, return empty list.
-
-    Returns:
-        List[Dict[str, Any]]: List of discovered device information dictionaries.
-                             Each dict contains: index, id, vendor, model, serial_number, user_defined_name.
-
-    Raises:
-        CameraError: If initialization fails and raise_on_error is True.
-
-    Example:
-        >>> devices = discover_devices("/path/to/producer.cti")
-        >>> for dev in devices:
-        ...     print(f"Device: {dev['user_defined_name']} (S/N: {dev['serial_number']})")
-    """
     # TODO: Request list of devices from CameraBase
     pass
 

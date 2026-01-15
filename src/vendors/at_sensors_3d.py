@@ -37,18 +37,24 @@ class CameraATSensors3D(CameraBase):
         "offset_y": "OffsetY"
     }
 
+
+    @classmethod
+    def from_config(cls, api_config_dict: dict, device_data_dict: dict, device_genicam_dict: dict) -> "CameraATSensors3D":
+        return cls(api_config_dict, device_data_dict, device_genicam_dict)
+
     
-    def __init__(self, api_config_dict, device_data_dict, device_genicam_dict):
+    def __init__(self, api_config_dict: dict, device_data_dict: dict, device_genicam_dict: dict):
         """
         Initialize AT Sensors 3D camera.
         
         Args:
             config (dict): Configuration dictionary passed to CameraBase
         """
-        super().__init__(api_config_dict=api_config_dict,
-                         device_data_dict=device_data_dict,
-                         device_genicam_dict=device_genicam_dict
-                         )
+        super().__init__(
+            api_config_dict=api_config_dict,
+            device_data_dict=device_data_dict,
+            device_genicam_dict=device_genicam_dict
+            )
         
         self.vendor_str = device_data_dict.get("vendor", "").strip()
         self.scan_type = device_data_dict.get("scanType")
@@ -81,8 +87,8 @@ class CameraATSensors3D(CameraBase):
             logger.info("Configured single-sensor mode (acquirer 0).")
             return
         if self.topology == "dual_sensor":
-            super().connect(device_selector=self._get_search_key(self.vendor_str, self.id_sensor2)) # index 1 (slave)
-            super().connect(device_selector=self._get_search_key(self.vendor_str, self.id_sensor1)) # index 0 (master)
+            super().connect(device_selector=self._get_search_key(self.vendor_str, self.id_sensor2)) # index 0 (slave)
+            super().connect(device_selector=self._get_search_key(self.vendor_str, self.id_sensor1)) # index 1 (master)
             logger.info("Configured dual-sensor mode (acquirers 0 and 1).")
             return
         raise CameraError(f"Invalid topology '{self.topology}'!")
@@ -180,6 +186,51 @@ class CameraATSensors3D(CameraBase):
             except Exception:
                 pass
             raise CameraError(f"Failed to acquire dual frames: {e}")
+
+
+    # -------------------------------
+    # Genicam parameter handling
+    # -------------------------------
+    def apply_genicam_parameters(self, genicam_dict: Dict[str, Any], acquirer_index: int = 0) -> None:
+        if not self.connected:
+            raise CameraError("Camera must be connected before applying parameters!")
+        
+        if not genicam_dict:
+            logger.debug("No GenICam parameters to apply.")
+            return
+        
+        # Apply sensor_1 parameters
+        if "sensor_1" in genicam_dict:
+            sensor1_params = genicam_dict.get("sensor_1", {}) or {}
+            if sensor1_params:
+                logger.info(f"Applying GenICam parameters to {self.id_sensor1} (acquirer 1): {len(sensor1_params)} parameters")
+                try:
+                    super().apply_genicam_parameters(sensor1_params, acquirer_index=0)
+                except ParameterError as e:
+                    logger.exception(f"Failed to configure {self.id_sensor1}.")
+                    if self.strict:
+                        raise CameraError(f"Failed to configure {self.id_sensor1}: {e}")
+        
+        # Apply sensor_2 parameters
+        elif "sensor_2" in genicam_dict:
+            sensor2_params = genicam_dict.get("sensor_2", {}) or {}
+            if sensor2_params:
+                if len(self._acquirers) < 2:
+                    logger.warning(f"{self.id_sensor2} parameters specified but only 1 acquirer available. Skipping...")
+                    return
+                
+                logger.info(f"Applying GenICam parameters to {self.id_sensor2} (acquirer 0): {len(sensor2_params)} parameters")
+                try:
+                    super().apply_genicam_parameters(sensor2_params, acquirer_index=1)
+                except ParameterError as e:
+                    logger.exception(f"Failed to configure {self.id_sensor2}.")
+                    if self.strict:
+                        raise CameraError(f"Failed to configure {self.id_sensor2}: {e}")
+
+        # Fallback
+        else:
+            logger.info(f"Applying GenICam parameters to acquirer {acquirer_index}...")
+            super().apply_genicam_parameters(genicam_dict, acquirer_index=acquirer_index)
 
 
     # -------------------------------
