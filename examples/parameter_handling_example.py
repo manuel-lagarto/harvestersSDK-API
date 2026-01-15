@@ -1,65 +1,92 @@
 #--------------------------------------------------------------------------
-# System Configuration
-#--------------------------------------------------------------------------
-import platform
-import sys
-import os
-
-# Change CTI_PATH as needed for the target GenTL producer
-if platform.system() == "Windows":
-    CTI_PATH = r"C:/Program Files/Balluff/ImpactAcquire/bin/x64/mvGenTLProducer.cti"
-elif platform.system() == "Linux":
-    CTI_PATH = r"/opt/cvb-14.01.008/drivers/genicam/libGevTL.cti"
-else:
-    raise OSError("Operating system not supported!")
-
-# Add the project root to the Python path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-
-#--------------------------------------------------------------------------
 # Imports and configuration
 #--------------------------------------------------------------------------
 from harvestersSDK_api import create_camera, list_supported_cameras
 
 print("Supported cameras:", list_supported_cameras())
-
-# Configuration dictionary
-config = {
-    "cti_path": CTI_PATH,
-    "device_name": '21815765M',
-    # "device_serial" "target_serial_number_here",
-    # "device_id" "target_id_here",
-}
+device_name = '21815765'
 
 
 #--------------------------------------------------------------------------
-# Parameter Handling Example
+# Example 1: Apply GenICam parameters from JSON config (via API)
 #--------------------------------------------------------------------------
-camera = create_camera("at_sensors_3d", config_dict=config)
+print("\n" + "="*70)
+print("EXAMPLE 1: Apply GenICam parameters from JSON config")
+print("="*70)
 
+camera = create_camera(device_name_base=device_name, config_path="./src/configs/config.json")
 camera.connect()
 
-# camera.set_parameter("RegionSelector", "Region0")
-# original_height = camera.get_parameter("Height")
-# print(f"Region height: {original_height}")
+# Apply all parameters from JSON to respective sensors
+print(f"\nApplying GenICam parameters from config.json...")
+camera.apply_genicam_parameters(camera.device_genicam_dict)
 
-# camera.set_parameter("RegionSelector", "Scan3dExtraction0")
-# original_height = camera.get_parameter("Height")
-# print(f"Region height: {original_height}")
+# Verify applied parameters for sensor_1
+print(f"\nVerifying sensor_1 parameters:")
+sensor1_params = camera.device_genicam_dict.get("sensor_1", {})
+for param_name in sensor1_params.keys():
+    try:
+        value = camera.get_parameter(param_name, acquirer_index=0)
+        print(f"    {param_name}: {value}")
+    except Exception as e:
+        print(f"    {param_name}: Error reading - {e}")
 
-# Get exposure time node value
-original_exposure_time = camera.get_exposure_time()
-print(f"Exposure time: {original_exposure_time}")
+# Verify applied parameters for sensor_2 (if dual-sensor)
+if len(camera._acquirers) >= 2:
+    print(f"\nVerifying sensor_2 parameters:")
+    sensor2_params = camera.device_genicam_dict.get("sensor_2", {})
+    for param_name in sensor2_params.keys():
+        try:
+            value = camera.get_parameter(param_name, acquirer_index=1)
+            print(f"  {param_name}: {value}")
+        except Exception as e:
+            print(f"  {param_name}: Error reading - {e}")
 
-# Set and verify new exposure time node value
-camera.set_exposure_time(2000)
-exposure_time = camera.get_exposure_time()
-print(f"Exposure time: {exposure_time}")
+camera.disconnect()
 
-# Set original exposure time node value
-camera.set_exposure_time(original_exposure_time)
-exposure_time = camera.get_exposure_time()
-print(f"Exposure time: {exposure_time}")
+
+#--------------------------------------------------------------------------
+# Example 2: Vendor-specific parameter handling methods
+#--------------------------------------------------------------------------
+print("\n" + "="*70)
+print("EXAMPLE 2: Vendor-specific parameter handling methods")
+print("="*70)
+
+camera = create_camera(device_name_base=device_name, config_path="./src/configs/config.json")
+camera.connect()
+
+# Get original values
+print(f"\nOriginal values (sensor_1 - acquirer 0):")
+original_exposure_time = camera.get_exposure_time(acquirer_index=0)
+print(f"    Exposure time: {original_exposure_time}")
+
+original_gain = camera.get_gain(acquirer_index=0)
+print(f"    Gain: {original_gain}")
+
+# Modify parameters using vendor-specific methods
+print(f"\nModifying parameters...")
+camera.set_exposure_time(2000, acquirer_index=0)
+camera.set_gain(2.5, acquirer_index=0)
+
+# Verify modifications
+print(f"\nVerifying modified values:")
+new_exposure_time = camera.get_exposure_time(acquirer_index=0)
+print(f"    Exposure time: {new_exposure_time}")
+
+new_gain = camera.get_gain(acquirer_index=0)
+print(f"    Gain: {new_gain}")
+
+# Restore original values
+print(f"\nRestoring original values...")
+camera.set_exposure_time(original_exposure_time, acquirer_index=0)
+camera.set_gain(original_gain, acquirer_index=0)
+
+# Verify restoration
+print(f"\nVerifying restored values:")
+restored_exposure_time = camera.get_exposure_time(acquirer_index=0)
+print(f"    Exposure time: {restored_exposure_time}")
+
+restored_gain = camera.get_gain(acquirer_index=0)
+print(f"    Gain: {restored_gain}")
 
 camera.disconnect()
