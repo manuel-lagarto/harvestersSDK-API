@@ -37,75 +37,91 @@ class CameraATSensors3D(CameraBase):
         "offset_y": "OffsetY"
     }
 
-    def __init__(self, config: dict):
+
+    @classmethod
+    def from_config(cls, api_config_dict: dict, device_data_dict: dict, device_genicam_dict: dict) -> "CameraATSensors3D":
+        return cls(api_config_dict, device_data_dict, device_genicam_dict)
+
+    
+    def __init__(self, api_config_dict: dict, device_data_dict: dict, device_genicam_dict: dict):
         """
         Initialize AT Sensors 3D camera.
         
         Args:
             config (dict): Configuration dictionary passed to CameraBase
         """
-        super().__init__(config=config)
+        super().__init__(
+            api_config_dict=api_config_dict,
+            device_data_dict=device_data_dict,
+            device_genicam_dict=device_genicam_dict
+            )
+        
+        self.vendor_str = device_data_dict.get("vendor", "").strip()
+        self.scan_type = device_data_dict.get("scanType")
+        self.topology  = (device_data_dict.get("topology") or "single_sensor").lower()
+        self.id_sensor1   = device_data_dict.get("sensor_1", {}).get("user_defined_name")
+        self.id_sensor2 = device_data_dict.get("sensor_2", {}).get("user_defined_name")
+
         logger.debug(f"CameraATSensors3D initialized.")
+
+    
+    # -------------------------------
+    # Search key helper
+    # -------------------------------
+    def _get_search_key(self, vendor_str, sensor_id) -> Dict[str, Any]:
+        if not sensor_id:
+            raise CameraError("user_defined_name not defined!")
+        return {"vendor": vendor_str, "user_defined_name": sensor_id}
 
 
     # -------------------------------
     # Camera setup
-    # -------------------------------
-    def setup(self, dual_configuration: bool = False, device_selectors: Optional[List[Any]] = None) -> None:
-        """
-        Setup camera configuration (single or dual sensors).
+    # -------------------------------    
+    def connect(self) -> None:
+        # Clear any previous acquirers
+        if self._acquirers:
+            super().disconnect()
 
-        Args:
-            dual_configuration (bool): If True, setup dual-sensor mode; else single.
-            device_selectors (List[Any], optional): List of selectors (index or dict).
-                - Single: [primary_selector] or None (uses config["device_name"]).
-                - Dual: [primary_selector, secondary_selector].
-        """
-        try:
-            # Clear any previous acquirers
-            if self._acquirers:
-                self.disconnect()
-
-            if not dual_configuration:
-                # Single-sensor mode: use base connect()
-                selector = (device_selectors[0] if device_selectors 
-                           else self.device_config or 0)
-                self.connect(device_selector=selector)
-                logger.info("Configured single-sensor mode (acquirer 0).")
-                return
-
-            # Dual-sensor: create two acquirers (indices 0 and 1)
-            if not device_selectors or len(device_selectors) < 2:
-                raise CameraError("Dual configuration requires 2 device selectors.")
-            
-            self.connect(device_selector=device_selectors[1])  # index 1 (secondary)
-            self.connect(device_selector=device_selectors[0])  # index 0 (primary)
+        if self.topology == "single_sensor":
+            super().connect(device_selector=self._get_search_key(self.vendor_str, self.id_sensor1))
+            logger.info("Configured single-sensor mode (acquirer 0).")
+            return
+        if self.topology == "dual_sensor":
+            super().connect(device_selector=self._get_search_key(self.vendor_str, self.id_sensor2)) # index 0 (slave)
+            super().connect(device_selector=self._get_search_key(self.vendor_str, self.id_sensor1)) # index 1 (master)
             logger.info("Configured dual-sensor mode (acquirers 0 and 1).")
-        except Exception as e:
-            logger.exception("setup failed.")
-            raise CameraError(f"setup failed: {e}")
+            return
+        raise CameraError(f"Invalid topology '{self.topology}'!")
 
 
     # -------------------------------
     # Dual-sensor acquisition overrides
-    # -------------------------------
-    def start_dual_acquisition(self) -> None:
-        """Start acquisition on both sensors (dual-sensor mode)."""
+    # -------------------------------    
+    def start_acquisition(self, acquirer_index: int = 0) -> None:
+        if self.topology == "single_sensor":
+            return super().start_acquisition(acquirer_index)
+
+        # Dual sensor acquisition
         if len(self._acquirers) < 2:
-            raise CameraError("Dual-sensor mode not configured.")
-        self.start_acquisition(acquirer_index=0)
-        self.start_acquisition(acquirer_index=1)
+            raise CameraError("Image acquirers for dual-sensor not configured!")
+        super().start_acquisition(acquirer_index=0)
+        super().start_acquisition(acquirer_index=1)
         logger.info("Started dual-sensor acquisition.")
 
-    def stop_dual_acquisition(self) -> None:
-        """Stop acquisition on both sensors (dual-sensor mode)."""
+    
+    def stop_acquisition(self, acquirer_index: int = 0) -> None:
+        if self.topology == "single_sensor":
+            return super().stop_acquisition(acquirer_index)
+
+        # Dual sensor acquisition
         if len(self._acquirers) < 2:
-            raise CameraError("Dual-sensor mode not configured.")
-        self.stop_acquisition(acquirer_index=0)
-        self.stop_acquisition(acquirer_index=1)
+            raise CameraError("Image acquirers for dual-sensor not configured!")
+        super().stop_acquisition(acquirer_index=0)
+        super().stop_acquisition(acquirer_index=1)
         logger.info("Stopped dual-sensor acquisition.")
     
-    def get_frames_dual(self, timeout_ms: Optional[int] = None) -> Dict[str, Any]:
+
+    def get_frames(self, timeout_ms: Optional[int] = None) -> Dict[str, Any]:
         """
         Fetch frames from both sensors.
 
@@ -115,21 +131,22 @@ class CameraATSensors3D(CameraBase):
         Returns:
             {'primary': frame0, 'secondary': frame1}
         """
-        if len(self._acquirers) < 2:
-            raise CameraError("Dual-sensor mode not configured.")
-        try:
-            primary = self.get_frame(acquirer_index=0, timeout_ms=timeout_ms)
-            secondary = self.get_frame(acquirer_index=1, timeout_ms=timeout_ms)
-            return {"primary": primary, "secondary": secondary}
-        except Exception as e:
-            logger.exception("Failed to fetch dual frames.")
-            raise AcquisitionError(f"Failed to fetch dual frames: {e}")
+        if self.topology == "dual_sensor":
+            if len(self._acquirers) < 2:
+                raise CameraError("Image acquirers for dual-sensor not configured!")
+            primary_frame   = super().get_frame(acquirer_index=0, timeout_ms=timeout_ms)
+            secondary_frame = super().get_frame(acquirer_index=1, timeout_ms=timeout_ms)
+            return {"primary_frame": primary_frame, "secondary_frame": secondary_frame}
+
+        # Fallback for wrong topology usage
+        primary_frame = super().get_frame(acquirer_index=0, timeout_ms=timeout_ms)
+        return {"primary_frame": primary_frame}
 
 
     # -------------------------------
     # Acquisition lifecycle
     # -------------------------------
-    def acquire_frames_dual(self, timeout_ms: Optional[int] = None) -> Dict[str, Any]:
+    def capture_frames(self, timeout_ms: Optional[int] = None) -> Dict[str, Any]:
         """
         Acquire frames from both sensors (dual-sensor mode) with automatic lifecycle.
         
@@ -153,22 +170,67 @@ class CameraATSensors3D(CameraBase):
         logger.info("Acquiring dual frames...")
         try:
             if len(self._acquirers) < 2:
-                raise CameraError("Dual-sensor mode not configured (need 2 acquirers).")
+                raise CameraError("Image acquirers for dual-sensor not configured!")
             
-            self.start_dual_acquisition()
-            primary = self.get_frame(acquirer_index=0, timeout_ms=timeout_ms)
-            secondary = self.get_frame(acquirer_index=1, timeout_ms=timeout_ms)
-            self.stop_dual_acquisition()
+            self.start_acquisition()
+            frames = self.get_frames(timeout_ms=timeout_ms)
+            self.stop_acquisition()
             
-            logger.info("Dual frames acquired successfully.")
-            return {"primary": primary, "secondary": secondary}
+            logger.info("Dual frames acquired successfully!")
+            return frames.copy()
+        
         except Exception as e:
-            logger.exception("Dual frame acquisition failed.")
+            logger.exception("Dual frame acquisition failed!")
             try:
-                self.stop_dual_acquisition()
+                self.stop_acquisition()
             except Exception:
                 pass
             raise CameraError(f"Failed to acquire dual frames: {e}")
+
+
+    # -------------------------------
+    # Genicam parameter handling
+    # -------------------------------
+    def apply_genicam_parameters(self, genicam_dict: Dict[str, Any], acquirer_index: int = 0) -> None:
+        if not self.connected:
+            raise CameraError("Camera must be connected before applying parameters!")
+        
+        if not genicam_dict:
+            logger.debug("No GenICam parameters to apply.")
+            return
+        
+        # Apply sensor_1 parameters
+        if "sensor_1" in genicam_dict:
+            sensor1_params = genicam_dict.get("sensor_1", {}) or {}
+            if sensor1_params:
+                logger.info(f"Applying GenICam parameters to {self.id_sensor1} (acquirer 1): {len(sensor1_params)} parameters")
+                try:
+                    super().apply_genicam_parameters(sensor1_params, acquirer_index=0)
+                except ParameterError as e:
+                    logger.exception(f"Failed to configure {self.id_sensor1}.")
+                    if self.strict:
+                        raise CameraError(f"Failed to configure {self.id_sensor1}: {e}")
+        
+        # Apply sensor_2 parameters
+        elif "sensor_2" in genicam_dict:
+            sensor2_params = genicam_dict.get("sensor_2", {}) or {}
+            if sensor2_params:
+                if len(self._acquirers) < 2:
+                    logger.warning(f"{self.id_sensor2} parameters specified but only 1 acquirer available. Skipping...")
+                    return
+                
+                logger.info(f"Applying GenICam parameters to {self.id_sensor2} (acquirer 0): {len(sensor2_params)} parameters")
+                try:
+                    super().apply_genicam_parameters(sensor2_params, acquirer_index=1)
+                except ParameterError as e:
+                    logger.exception(f"Failed to configure {self.id_sensor2}.")
+                    if self.strict:
+                        raise CameraError(f"Failed to configure {self.id_sensor2}: {e}")
+
+        # Fallback
+        else:
+            logger.info(f"Applying GenICam parameters to acquirer {acquirer_index}...")
+            super().apply_genicam_parameters(genicam_dict, acquirer_index=acquirer_index)
 
 
     # -------------------------------

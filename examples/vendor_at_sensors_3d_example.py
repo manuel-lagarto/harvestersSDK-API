@@ -1,67 +1,25 @@
 #--------------------------------------------------------------------------
-# System Configuration
+# Imports & path configuration
 #--------------------------------------------------------------------------
 import platform
 import sys
 import os
 
-import time
-start_total = time.perf_counter()
-
-# Change CTI_PATH as needed for the target GenTL producer
-if platform.system() == "Windows":
-    CTI_PATH = r"C:/Program Files/Balluff/ImpactAcquire/bin/x64/mvGenTLProducer.cti"
-elif platform.system() == "Linux":
-    CTI_PATH = r"/opt/cvb-14.01.008/drivers/genicam/libGevTL.cti"
-else:
-    raise OSError("Operating system not supported!")
-
-# Add the project root to the Python path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-
-#--------------------------------------------------------------------------
-# Imports & path configuration
-#--------------------------------------------------------------------------
 import numpy as np
 import pickle
 import open3d as o3d
 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from harvestersSDK_api import create_camera, list_supported_cameras
 from src.utils.point_cloud_processing import *
 
-# Example settings
-SAVE_FRAME = False
-SAVE_CLOUD = False
-VISUALIZATION = True
+# Example configuration flags
+SAVE_FRAMES = False
+SAVE_CLOUDS = False
+O3D_VISUALIZATION = True
 
-# Paths configuration
-save_suffix = "example_scan0"
-frame_dump_primary = f"./_frame_dumps/example_saves/frame_dump_primary_{save_suffix}.pkl"
-frame_dump_secondary = f"./_frame_dumps/example_saves/frame_dump_secondary_{save_suffix}.pkl"
-pcd_primary_out = f"./_point_clouds/example_saves/point_cloud_primary_{save_suffix}.xyz"
-pcd_secondary_out = f"./_point_clouds/example_saves/point_cloud_secondary_{save_suffix}.xyz"
-
-
-#--------------------------------------------------------------------------
-# Device Discovery and Configuration
-#--------------------------------------------------------------------------
-print("\n" + "=" * 70)
-print("DUAL-HEAD ACQUISITION EXAMPLE (AT Sensors 3D Camera)")
-print("=" * 70)
-
-# List supported vendors
 print("Supported cameras:", list_supported_cameras())
-
-# Define device names
-device_name_primary = '21815765M'
-device_name_secondary = '21815765S'
-
-# Configuration dictionary
-config = {
-    "cti_path": CTI_PATH,
-    "timeout_ms": 5000,
-}
+device_name = '21815765'
 
 # C6-4090-MCS-420-530-D2-1G calibration dictionary (same for both sensors)
 camera_calibration = {
@@ -71,144 +29,196 @@ camera_calibration = {
     "stretch_y": 1.0,          # Y distance scaling
 }
 
+# Paths configuration
+scan_suffix = "example_scan0"
+save_paths = {
+    "frame_dump_primary": f"./_saves/frame_dump_primary_{scan_suffix}.pkl",
+    "frame_dump_secondary": f"./_saves/frame_dump_secondary_{scan_suffix}.pkl",
+    "pcd_primary_out": f"./_saves/pcd_primary_out_{scan_suffix}.pkl",
+    "pcd_secondary_out": f"./_saves/pcd_secondary_out_{scan_suffix}.pkl",
+    "pcd_combined_out": f"./_saves/pcd_combined_out_{scan_suffix}.pkl",
+}
+
+
+#--------------------------------------------------------------------------
+# Timer configuration
+#--------------------------------------------------------------------------
+import time
+
+timers = {
+    "start_total": 0.0,
+    "elapsed_total": 0.0,
+    "start_connect": 0.0,
+    "elapsed_connect": 0.0,
+    "start_acquire": 0.0,
+    "elapsed_acquire": 0.0,
+    "start_processing": 0.0,
+    "elapsed_processing": 0.0,
+}
+start_total = time.perf_counter()
+
 
 #--------------------------------------------------------------------------
 # AT Sensors 3D Acquisition Example (dual-head configuration)
 #--------------------------------------------------------------------------
-print("\nCreating camera instance...")
-start_connect = time.perf_counter()
+def connect():
+    print("\n" + "=" * 70)
+    print("DUAL-HEAD ACQUISITION EXAMPLE (AT Sensors 3D Camera)")
+    print("=" * 70)
 
-# 1. Create a camera instance
-camera = create_camera("at_sensors_3d", config_dict=config)
+    timers["start_connect"] = time.perf_counter()
+    camera = create_camera(device_name_base=device_name, config_path="./src/configs/config.json")
+    camera.connect()
+    timers["elapsed_total"] = time.perf_counter() - timers["start_connect"]    
+    return camera
 
-# 2. Setup a dual-head configuration
-camera.setup(
-    dual_configuration=True,
-    device_selectors=[
-        {'user_defined_name': device_name_primary},
-        {'user_defined_name': device_name_secondary}
-    ]
-)
-end_connect = time.perf_counter()
 
-print("\nAcquiring dual frames with automatic lifecycle management...")
-try:
-    start_acquire = time.perf_counter()
-
-    # 3. Use acquire_frames_dual() for automatic lifecycle
-    frames = camera.acquire_frames_dual(timeout_ms=5000)
-    end_acquire = time.perf_counter()
-    
-    print(f"\n✓ Dual frames acquired successfully!")    
-except Exception as e:
-    print(f"\n✗ Acquisition failed: {e}")
-    sys.exit(1)
-
-# 4. Disconnect from camera & cleanup
-print("\nDisconnecting...")
-camera.disconnect()
-print("✓ Done!")
+def capture(camera):
+    try:
+        timers["start_acquire"] = time.perf_counter()
+        frames = camera.capture_frames(timeout_ms=5000)
+        timers["elapsed_acquire"] = time.perf_counter() - timers["start_acquire"]
+    except Exception as e:
+        print(f"\n✗ Acquisition failed: {e}")
+        sys.exit(1)
+    return frames
 
 
 #--------------------------------------------------------------------------
 # Save frames & display results
 #--------------------------------------------------------------------------
-print("\n" + "=" * 70)
-print("RESULTS")
-print("=" * 70)
+def show_acquisition_results(frames):
+    print("\n" + "=" * 70)
+    print("RESULTS")
+    print("=" * 70)
+    
+    # Save separate frames for later processing
+    primary_frame = frames['primary']
+    secondary_frame = frames['secondary']
 
-# Save separate frames for later processing
-primary_frame = frames['primary']
-secondary_frame = frames['secondary']
+    # Display results for primary sensor (master)
+    print(f"\nPrimary frame components: {len(primary_frame)}")
+    if primary_frame:
+        print(f"    Resolution:  {primary_frame[0]['width']} x {primary_frame[0]['height']}")
+        print(f"    Data format: {primary_frame[0]['data_format']}")
+        print(f"    Frame data:  {primary_frame[0]}")
 
-# Display results for primary sensor (master)
-print(f"\n   Primary frame:")
-print(f"      Components:  {len(primary_frame)}")
-if primary_frame:
-    print(f"      Resolution:  {primary_frame[0]['width']} x {primary_frame[0]['height']}")
-    print(f"      Data format: {primary_frame[0]['data_format']}")
-    print(f"      Frame data:  {primary_frame[0]}")
-
-# Display results for secondary sensor (slave)
-print(f"\n   Secondary frame:")
-print(f"      Components:  {len(secondary_frame)}")
-if secondary_frame:
-    print(f"      Resolution:  {secondary_frame[0]['width']} x {secondary_frame[0]['height']}")
-    print(f"      Data format: {secondary_frame[0]['data_format']}")
-    print(f"      Frame data:  {secondary_frame[0]}")
-
-# Save frame dumps
-if SAVE_FRAME:
-    print("\nSaving frame dumps...")
-    save_frame_dump(primary_frame, frame_dump_primary)
-    save_frame_dump(secondary_frame, frame_dump_secondary)
-    print(f"   Primary frame:   {frame_dump_primary}")
-    print(f"   Secondary frame: {frame_dump_secondary}")
+    # Display results for secondary sensor (slave)
+    print(f"\nSecondary frame components: {len(secondary_frame)}")
+    if secondary_frame:
+        print(f"    Resolution:  {secondary_frame[0]['width']} x {secondary_frame[0]['height']}")
+        print(f"    Data format: {secondary_frame[0]['data_format']}")
+        print(f"    Frame data:  {secondary_frame[0]}")
+    
+    # Save frames
+    if SAVE_FRAMES:
+        print("\nSaving frame dumps...")
+        save_frame_dump(primary_frame, save_paths["frame_dump_primary"])
+        save_frame_dump(secondary_frame, save_paths["frame_dump_secondary"])
+        print(f"    Primary frame:   {save_paths['frame_dump_primary']}")
+        print(f"    Secondary frame: {save_paths['frame_dump_secondary']}")
 
 
 #--------------------------------------------------------------------------
 # Frame manipulation example
 #--------------------------------------------------------------------------
-print("\n" + "=" * 70)
-print("POINT CLOUD PROCESSING")
-print("=" * 70)
-
-start_process = time.perf_counter()
-
-# Build point cloud from primary sensor
-pcd_primary = build_point_cloud_from_frame(
-    primary_frame,
-    flip_yx=False,
-    camera_calibration=camera_calibration
-)
-print(f"  Primary point cloud: {pcd_primary_out} ({pcd_primary.shape[0]} points)")
-
-print()
-# Build point cloud from secondary sensor (flip_yx=True for 180° rotation)
-pcd_secondary = build_point_cloud_from_frame(
-    secondary_frame,
-    flip_yx=True,  # Mirror for dual-sensor alignment
-    camera_calibration=camera_calibration
-)
-print(f"  Secondary point cloud: {pcd_secondary_out} ({pcd_secondary.shape[0]} points)")
-
-end_process = time.perf_counter()
-
-if SAVE_CLOUD:
-    print("\nSaving point clouds...")
-    save_point_cloud_data(pcd_primary, pcd_primary_out)
-    save_point_cloud_data(pcd_secondary, pcd_secondary_out)
-    print(f"  Primary point cloud:   {pcd_primary_out}")
-    print(f"  Secondary point cloud: {pcd_secondary_out}")
-
-end_total = time.perf_counter()
-
-
-#--------------------------------------------------------------------------
-# Open3D Visualization (optional)
-#--------------------------------------------------------------------------
-if VISUALIZATION:
+def process_point_clouds(frames):    
     print("\n" + "=" * 70)
-    print("POINT CLOUD VISUALIZATION")
+    print("POINT CLOUD PROCESSING")
     print("=" * 70)
 
-    pcd_master_o3d = o3d.geometry.PointCloud()
-    pcd_master_o3d.points = o3d.utility.Vector3dVector(pcd_primary)
-    visualize_point_cloud([pcd_master_o3d], "AT Sensors Example: Master Point Cloud")
+    # Save separate frames for later processing
+    primary_frame = frames['primary']
+    secondary_frame = frames['secondary']
 
-    pcd_slave_o3d = o3d.geometry.PointCloud()
-    pcd_slave_o3d.points = o3d.utility.Vector3dVector(pcd_secondary)
-    visualize_point_cloud([pcd_slave_o3d], "AT Sensors Example: Slave Point Cloud")
+    timers["start_processing"] = time.perf_counter()
     
-#---------------------------------------------------------------------------
-# Time Statistics
-#---------------------------------------------------------------------------
-print("\n" + "=" * 70)
-print("TIME STATISTICS")
-print("=" * 70)
+    # Build point cloud from primary sensor
+    pcd_primary = build_point_cloud_from_frame(
+        primary_frame,
+        flip_yx=False,
+        camera_calibration=camera_calibration
+    )
+    print(f"\nPrimary point cloud: {pcd_primary.shape[0]} points")
 
-print(f"Camera connection:      {end_connect - start_connect:.4f} s")
-print(f"Frame acquisition:      {end_acquire - start_acquire:.4f} s")
-print(f"Point cloud processing: {end_process - start_process:.4f} s")
-print("-" * 70)
-print(f"Total time:             {end_total - start_total:.4f} s")
+    print()
+    # Build point cloud from secondary sensor (flip_yx=True for 180° rotation)
+    pcd_secondary = build_point_cloud_from_frame(
+        secondary_frame,
+        flip_yx=True,  # Mirror for dual-sensor alignment
+        camera_calibration=camera_calibration
+    )
+    print(f"\nSecondary point cloud: {pcd_secondary.shape[0]} points")
+    
+    # Combine point clouds
+    pcd_combined = np.vstack([pcd_primary, pcd_secondary])
+    print(f"\nCombined point cloud: {pcd_combined.shape[0]} points")
+    
+    timers["elapsed_processing"] = time.perf_counter() - timers["start_processing"]
+
+    # Save point clouds
+    if SAVE_CLOUDS:
+        print("\nSaving point clouds...")
+        save_point_cloud_data(pcd_primary, save_paths["pcd_primary_out"])
+        save_point_cloud_data(pcd_secondary, save_paths["pcd_secondary_out"])
+        save_point_cloud_data(pcd_combined, save_paths["pcd_combined_out"])
+        print(f"    Primary point cloud:   {save_paths['pcd_primary_out']}")
+        print(f"    Secondary point cloud: {save_paths['pcd_secondary_out']}")
+        print(f"    Combined point cloud:  {save_paths['pcd_combined_out']}")
+    
+    # Visualize
+    if O3D_VISUALIZATION:
+        print("\n" + "=" * 70)
+        print("POINT CLOUD VISUALIZATION")
+        print("=" * 70)
+
+        pcd_master_o3d = o3d.geometry.PointCloud()
+        pcd_master_o3d.points = o3d.utility.Vector3dVector(pcd_primary)
+        visualize_point_cloud([pcd_master_o3d], "AT Sensors Example: Master Point Cloud")
+
+        pcd_slave_o3d = o3d.geometry.PointCloud()
+        pcd_slave_o3d.points = o3d.utility.Vector3dVector(pcd_secondary)
+        visualize_point_cloud([pcd_slave_o3d], "AT Sensors Example: Slave Point Cloud")
+
+        pcd_combined_o3d = o3d.geometry.PointCloud()
+        pcd_combined_o3d.points = o3d.utility.Vector3dVector(pcd_combined)
+        visualize_point_cloud([pcd_combined_o3d], "AT Sensors Example: Combined Point Cloud")
+
+
+def show_time_statistics():
+    print("\n" + "=" * 70)
+    print("TIME STATISTICS")
+    print("=" * 70)
+
+    print(f"Camera connection:      {timers['elapsed_connect']:.4f} s")
+    print(f"Frame acquisition:      {timers['elapsed_acquire']:.4f} s")
+    print(f"Point cloud processing: {timers['elapsed_processing']:.4f} s")
+    print("-" * 70)
+    print(f"Total time:             {timers['elapsed_total']:.4f} s")
+
+
+#--------------------------------------------------------------------------
+# Main inspection function
+#--------------------------------------------------------------------------
+def inspect(camera):
+    frames = capture(camera)
+    if frames:
+        show_acquisition_results(frames)
+        process_point_clouds(frames)
+
+    # continue use case inspection here...
+
+
+#--------------------------------------------------------------------------
+# Main
+#--------------------------------------------------------------------------
+if __name__ == "__main__":
+    camera = connect()
+    
+    try:
+        print("\nAcquiring dual frames...")
+        inspect(camera)
+        print("\n✓ Done!")
+    finally:
+        camera.disconnect()
+        show_time_statistics()

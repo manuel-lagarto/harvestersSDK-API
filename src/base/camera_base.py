@@ -26,7 +26,7 @@ class CameraBase(ABC):
     Manages single-sensor connection, acquisition, and parameter access via TransportHarvesters.
     """
 
-    def __init__(self, config: dict):
+    def __init__(self, api_config_dict: dict, device_data_dict: dict, device_genicam_dict: dict):
         """
         Initialize camera with configuration.
 
@@ -38,22 +38,14 @@ class CameraBase(ABC):
                 - device_id (str, optional): Device id (MAC::IP format)
                 - timeout_ms (int, optional): Frame timeout in milliseconds
         """
-        self.config = config
-        self.timeout_ms = config.get("timeout_ms", 5000)
+        self.api_config_dict = api_config_dict
+        self.device_data_dict = device_data_dict or {}
+        self.device_genicam_dict = device_genicam_dict or {}
+        self.timeout_ms = self.api_config_dict.get("timeout_ms", 5000)
         self.strict = True # If True, raise exceptions; if False, return fallback
 
-        # Map user-friendly config keys to Harvester keys
-        # TODO: add index option
-        self.device_config = {}
-        if "device_name" in config:
-            self.device_config["user_defined_name"] = config["device_name"]
-        if "device_serial" in config:
-            self.device_config["serial_number"] = config["device_serial"]
-        if "device_id" in config:
-            self.device_config["id"] = config["device_id"]
-
         # Initialize transport layer
-        cti_path = config.get("cti_path", "/opt/cvb/drivers/genicam/libGevTL.cti")
+        cti_path = self.api_config_dict.get("cti_path", "/opt/cvb/drivers/genicam/libGevTL.cti")
         if not cti_path:
             raise CameraError("cti_path is required in config")
         self._transport = TransportHarvesters(cti_path)
@@ -63,7 +55,7 @@ class CameraBase(ABC):
         self._acquiring_states: Dict[int, bool] = {}  # Track acquiring state per acquirer
         self._initialized = False  # Track if transport has been initialized
 
-        logger.debug(f"CameraBase initialized with config: {self.device_config}.")
+        logger.debug(f"CameraBase initialized.")
 
 
     # -------------------------------
@@ -101,7 +93,7 @@ class CameraBase(ABC):
 
         Args:
             device_selector: Device selector (int index or dict with keys like 'user_defined_name').
-                           If None, uses self.device_config.
+                           If None, defaults to index 0.
 
         Returns:
             ImageAcquirer: The created acquirer handle.
@@ -111,7 +103,7 @@ class CameraBase(ABC):
             self._ensure_transport_initialized()
 
             # Use provided selector or fall back to device_config
-            selector = device_selector or self.device_config or 0
+            selector = device_selector or 0
 
             # Create acquirer via transport
             ia = self._transport.create_image_acquirer(selector)
@@ -322,6 +314,32 @@ class CameraBase(ABC):
             if self.strict:
                 raise ParameterError(f"Failed to get parameter {param_name}: {e}")
             return None
+
+
+    # -------------------------------
+    # Genicam parameter handling
+    # -------------------------------
+    def apply_genicam_parameters(self, genicam_dict: Dict[str, Any], acquirer_index: int = 0) -> None:
+        if not genicam_dict:
+            logger.debug("No GenICam parameters to apply.")
+            return
+        
+        logger.info(f"Applying {len(genicam_dict)} GenICam parameter(s) to acquirer {acquirer_index}...")
+        
+        failed_params = []
+        for param_name, param_value in genicam_dict.items():
+            try:
+                self.set_parameter(param_name, param_value, acquirer_index=acquirer_index)
+                logger.debug(f"Set parameter: {param_name} = {param_value}")
+            except ParameterError as e:
+                logger.warning(f"Failed to set parameter: {param_name}: {e}")
+                failed_params.append((param_name, str(e)))
+        
+        if failed_params:
+            error_msg = "; ".join([f"{name}: {err}" for name, err in failed_params])
+            logger.warning(f"Some parameters failed to set: {error_msg}")
+        else:
+            logger.info(f"All {len(genicam_dict)} parameters applied successfully!")
 
 
     # -------------------------------
