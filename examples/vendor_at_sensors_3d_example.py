@@ -59,7 +59,6 @@ timers = {
     "start_processing": 0.0,
     "elapsed_processing": 0.0,
 }
-start_total = time.perf_counter()
 
 
 #--------------------------------------------------------------------------
@@ -73,7 +72,7 @@ def connect():
     timers["start_connect"] = time.perf_counter()
     camera = create_camera(device_name_base=device_name, config_path=CAMERA_CONFIG_PATH)
     camera.connect()
-    timers["elapsed_total"] = time.perf_counter() - timers["start_connect"]    
+    timers["elapsed_connect"] = time.perf_counter() - timers["start_connect"]    
     return camera
 
 
@@ -198,6 +197,8 @@ def show_time_statistics():
     print("\n" + "=" * 70)
     print("TIME STATISTICS")
     print("=" * 70)
+
+    timers["elapsed_total"] = timers['elapsed_connect'] + timers['elapsed_acquire'] + timers['elapsed_processing']
 
     print(f"Camera connection:      {timers['elapsed_connect']:.4f} s")
     print(f"Frame acquisition:      {timers['elapsed_acquire']:.4f} s")
