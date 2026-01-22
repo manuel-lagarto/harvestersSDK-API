@@ -71,7 +71,8 @@ class CameraATSensors3D(CameraBase):
     def _get_search_key(self, vendor_str, sensor_id) -> Dict[str, Any]:
         if not sensor_id:
             raise CameraError("user_defined_name not defined!")
-        return {"vendor": vendor_str, "user_defined_name": sensor_id}
+        search_key = {"vendor": vendor_str, "user_defined_name": sensor_id}
+        return search_key
 
 
     # -------------------------------

@@ -23,7 +23,7 @@ print("Supported cameras:", list_supported_cameras())
 device_name = '21815765'
 
 # C6-4090-MCS-420-530-D2-1G calibration dictionary (same for both sensors)
-camera_calibration = {
+CAMERA_CALIBRATION = {
     "scale_z": 0.0625,         # Sensor C-scaler
     "pixel_to_mm_x": 0.0875,   # X scaling calibration
     "pixel_to_mm_z": 0.1955,   # Z scaling calibration
@@ -31,13 +31,17 @@ camera_calibration = {
 }
 
 # Paths configuration
-scan_suffix = "example_scan0"
+camera_config_path = "./src/configs/config.json"
+# camera_config_path = "./CaptureModule_3D/harvestersSDK-API/src/configs/config.json"
+
+capture_suffix = "example_scan"
+capture_count = 0
 save_paths = {
-    "frame_dump_primary": f"./_saves/frame_dump_primary_{scan_suffix}.pkl",
-    "frame_dump_secondary": f"./_saves/frame_dump_secondary_{scan_suffix}.pkl",
-    "pcd_primary_out": f"./_saves/pcd_primary_out_{scan_suffix}.pkl",
-    "pcd_secondary_out": f"./_saves/pcd_secondary_out_{scan_suffix}.pkl",
-    "pcd_combined_out": f"./_saves/pcd_combined_out_{scan_suffix}.pkl",
+    "frame_dump_primary": f"./_saves/frame_dump_primary_{capture_suffix}{capture_count}.pkl",
+    "frame_dump_secondary": f"./_saves/frame_dump_secondary_{capture_suffix}{capture_count}.pkl",
+    "pcd_primary_out": f"./_saves/pcd_primary_out_{capture_suffix}{capture_count}.pkl",
+    "pcd_secondary_out": f"./_saves/pcd_secondary_out_{capture_suffix}{capture_count}.pkl",
+    "pcd_combined_out": f"./_saves/pcd_combined_out_{capture_suffix}{capture_count}.pkl",
 }
 
 
@@ -68,7 +72,7 @@ def connect():
     print("=" * 70)
 
     timers["start_connect"] = time.perf_counter()
-    camera = create_camera(device_name_base=device_name, config_path="./src/configs/config.json")
+    camera = create_camera(device_name_base=device_name, config_path=camera_config_path)
     camera.connect()
     timers["elapsed_total"] = time.perf_counter() - timers["start_connect"]    
     return camera
@@ -88,14 +92,14 @@ def capture(camera):
 #--------------------------------------------------------------------------
 # Save frames & display results
 #--------------------------------------------------------------------------
-def show_acquisition_results(frames, scan_suffix="scan0"):
+def show_acquisition_results(frames, capture_suffix="example", capture_count=0):
     print("\n" + "=" * 70)
     print("RESULTS")
     print("=" * 70)
     
     # Save separate frames for later processing
-    primary_frame = frames['primary']
-    secondary_frame = frames['secondary']
+    primary_frame = frames['primary_frame']
+    secondary_frame = frames['secondary_frame']
 
     # Display results for primary sensor (master)
     print(f"\nPrimary frame components: {len(primary_frame)}")
@@ -114,6 +118,8 @@ def show_acquisition_results(frames, scan_suffix="scan0"):
     # Save frames
     if SAVE_FRAMES:
         print("\nSaving frame dumps...")
+        save_paths["frame_dump_primary"] = f"./_saves/frame_dump_primary_{capture_suffix}{capture_count}.pkl"
+        save_paths["frame_dump_secondary"] = f"./_saves/frame_dump_secondary_{capture_suffix}{capture_count}.pkl"
         save_frame_dump(primary_frame, save_paths["frame_dump_primary"])
         save_frame_dump(secondary_frame, save_paths["frame_dump_secondary"])
         print(f"    Primary frame:   {save_paths['frame_dump_primary']}")
@@ -123,14 +129,14 @@ def show_acquisition_results(frames, scan_suffix="scan0"):
 #--------------------------------------------------------------------------
 # Frame manipulation example
 #--------------------------------------------------------------------------
-def process_point_clouds(frames, scan_suffix="scan0"):    
+def process_point_clouds(frames, capture_suffix="example", capture_count=0):
     print("\n" + "=" * 70)
     print("POINT CLOUD PROCESSING")
     print("=" * 70)
 
     # Save separate frames for later processing
-    primary_frame = frames['primary']
-    secondary_frame = frames['secondary']
+    primary_frame = frames['primary_frame']
+    secondary_frame = frames['secondary_frame']
 
     timers["start_processing"] = time.perf_counter()
     
@@ -138,7 +144,7 @@ def process_point_clouds(frames, scan_suffix="scan0"):
     pcd_primary = build_point_cloud_from_frame(
         primary_frame,
         flip_yx=False,
-        camera_calibration=camera_calibration
+        camera_calibration=CAMERA_CALIBRATION
     )
     print(f"\nPrimary point cloud: {pcd_primary.shape[0]} points")
 
@@ -147,7 +153,7 @@ def process_point_clouds(frames, scan_suffix="scan0"):
     pcd_secondary = build_point_cloud_from_frame(
         secondary_frame,
         flip_yx=True,  # Mirror for dual-sensor alignment
-        camera_calibration=camera_calibration
+        camera_calibration=CAMERA_CALIBRATION
     )
     print(f"\nSecondary point cloud: {pcd_secondary.shape[0]} points")
     
@@ -160,6 +166,9 @@ def process_point_clouds(frames, scan_suffix="scan0"):
     # Save point clouds
     if SAVE_CLOUDS:
         print("\nSaving point clouds...")
+        save_paths["pcd_primary_out"] = f"./_saves/pcd_primary_out_{capture_suffix}{capture_count}.pkl"
+        save_paths["pcd_secondary_out"] = f"./_saves/pcd_secondary_out_{capture_suffix}{capture_count}.pkl"
+        save_paths["pcd_combined_out"] = f"./_saves/pcd_combined_out_{capture_suffix}{capture_count}.pkl"
         save_point_cloud_data(pcd_primary, save_paths["pcd_primary_out"])
         save_point_cloud_data(pcd_secondary, save_paths["pcd_secondary_out"])
         save_point_cloud_data(pcd_combined, save_paths["pcd_combined_out"])
@@ -201,11 +210,11 @@ def show_time_statistics():
 #--------------------------------------------------------------------------
 # Main inspection function
 #--------------------------------------------------------------------------
-def inspect(camera):
+def inspect(camera, capture_count):
     frames = capture(camera)
     if frames:
-        show_acquisition_results(frames)
-        process_point_clouds(frames)
+        show_acquisition_results(frames, capture_suffix, capture_count)
+        process_point_clouds(frames, capture_suffix, capture_count)
 
     # continue use case inspection here...
 
@@ -228,7 +237,7 @@ if __name__ == "__main__":
                 # Create and start capture thread
                 capture_thread = threading.Thread(
                     target=inspect,
-                    args=(camera,),
+                    args=(camera, capture_count,),
                     name=f"CaptureThread {capture_count}"
                 )
                 capture_thread.start()
